@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
 import os
-from src.satprod.data_handlers.utils import sin_transform, cos_transform
+from satprod.data_handlers.utils import sin_transform, cos_transform
 
 def read_wind_data(path):
     '''

@@ -5,8 +5,7 @@ from datetime import datetime, timedelta
 import os
 import torchvision
 import cv2
-from img_data import SatImgDataset, SatImg
-#from src.satprod.data_handlers.img_data import SatImgDataset
+from satprod.data_handlers.img_data import SatImgDataset, SatImg
 
 class SatVid():
 
@@ -86,7 +85,7 @@ class OpticalFlow():
         self.name = name
         self.videopath = os.path.join(root, 'data/video')
     
-    def dense(self, save: str):
+    def farneback(self, save: str):
         cap = cv2.VideoCapture(os.path.join(self.videopath, self.name))
 
         _, frame1 = cap.read()
@@ -101,8 +100,10 @@ class OpticalFlow():
             _, frame2 = cap.read()
             if frame2 is not None: 
                 next = cv2.cvtColor(frame2,cv2.COLOR_BGR2GRAY)
-
-                flow = cv2.calcOpticalFlowFarneback(prvs,next, None, 0.5, 3, 15, 3, 5, 1.2, 0)
+                # calcOpticalFlowFarneback(prev, next, pyr_scale, 
+                # levels, winsize, iterations, poly_n, poly_sigma, flags[, flow])
+                #flow = cv2.calcOpticalFlowFarneback(prvs,next, None, 0.5, 3, 15, 3, 5, 1.2, 0)
+                flow = cv2.calcOpticalFlowFarneback(prvs,next, None, 0.5, 1, 15, 3, 7, 1.5, 0)
 
                 mag, ang = cv2.cartToPolar(flow[...,0], flow[...,1])
                 hsv[...,0] = ang*180/np.pi/2
@@ -131,13 +132,13 @@ class OpticalFlow():
         cap = cv2.VideoCapture(os.path.join(self.videopath, self.name))
 
         # params for ShiTomasi corner detection
-        feature_params = dict( maxCorners = 100,
-                            qualityLevel = 0.3,
+        feature_params = dict( maxCorners = 10,#100,
+                            qualityLevel = 0.1,#0.3,
                             minDistance = 7,
                             blockSize = 7 )
 
         # Parameters for lucas kanade optical flow
-        lk_params = dict( winSize  = (5,5),#(15,15),
+        lk_params = dict( winSize  = (15,15),#(15,15),
                         maxLevel = 2,
                         criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))
 
@@ -197,18 +198,18 @@ if __name__=='__main__':
     root = f'{cd}/../../..'
     v = SatVid(root)
     
-    start = datetime(2018,6,28,6)
-    stop = datetime(2018,6,28,18)
+    start = datetime(2018,6,29,6)#datetime(2018,6,28,6)
+    stop = datetime(2018,6,29,18)#datetime(2018,6,28,18)
 
-    name = f'resized.avi'
+    name = f'resized_1.avi'
     #v.delete(name)
 
-    v.create(name, start, stop, True, 20)
+    v.create(name, start, stop, True, 100)
     v.play(name, 0.75)
 
-    of = OpticalFlow(root, name)
+    #of = OpticalFlow(root, name)
     #of.lukasKanade(f'.')
-    of.dense(f'.')
+    #of.farneback(f'.')
 
     v.delete(name)
 
