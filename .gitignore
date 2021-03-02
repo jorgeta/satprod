@@ -1,0 +1,16 @@
+# data
+/data
+/wind_data
+
+# any datafile
+*.txt
+*.csv
+
+# image and video files
+*.png
+*.avi
+
+# other
+*.ipynb_checkpoints
+*.vscode
+__pycache__/
