@@ -1,5 +1,8 @@
 import yaml
 from munch import Munch
+from enum import Enum
+from datetime import datetime
+from dataclasses import dataclass
 
 def read_yaml(path: str) -> Munch:
     """Read yaml file to a Munch object.
@@ -12,3 +15,14 @@ def read_yaml(path: str) -> Munch:
     """
     with open(path) as f:
         return Munch.fromDict(yaml.load(f, yaml.SafeLoader))
+
+class ImgType(Enum):
+    SAT = 'sat'
+    DENSE = 'dense'
+    SPARSE = 'sparse'
+    SPARSEMASK = 'sparsemask'
+
+@dataclass
+class TimeInterval:
+    start: datetime
+    stop: datetime
