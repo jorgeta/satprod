@@ -9,7 +9,7 @@ import torch.utils.data
 
 import cv2
 
-from satprod.data_handlers.utils import datetime2path, path2datetime
+from satprod.data_handlers.data_utils import datetime2path, path2datetime
 from satprod.configs.config_utils import ImgType
 
 class Img():
@@ -82,14 +82,10 @@ class SatImg(Img):
         
         self.img = masked_img
 
-class DenseFlowImg(Img):
-    pass
-
-class SparseFlowImg(Img):
-    pass
-
-class SparseFlowMaskImg(Img):
-    pass
+class FlowImg(Img):
+    def __init__(self, img, date: datetime, imgType: ImgType):
+        super().__init__(img, date)
+        self.imgType = imgType
 
 class ImgDataset(torch.utils.data.Dataset):
     '''
@@ -126,9 +122,7 @@ class ImgDataset(torch.utils.data.Dataset):
         img = cv2.imread(self.img_paths[idx],1)
         date = self.timestamps[idx]
 
-        if self.imgType==ImgType.DENSE: return DenseFlowImg(img, date)
-        elif self.imgType.name==ImgType.SPARSE: return SparseFlowImg(img, date)
-        elif self.imgType.name==ImgType.SPARSEMASK: return SparseFlowMaskImg(img, date)
+        if self.imgType!=ImgType.SAT: return FlowImg(img, date, self.imgType)
         else: return SatImg(img, date)
 
     def __len__(self):
@@ -136,10 +130,3 @@ class ImgDataset(torch.utils.data.Dataset):
     
     def getDateIdx(self, date: datetime) -> int:
         return self.timestamps.index(date)
-
-if __name__=='__main__':
-    imgType = ImgType('sat')
-
-    data = ImgDataset(imgType)
-
-    print(data.img_paths[0])

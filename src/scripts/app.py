@@ -2,22 +2,29 @@ import fire
 import os
 from datetime import datetime
 import cv2
+import logging
 
 from satprod.configs.config_utils import read_yaml, TimeInterval, ImgType
-from satprod.data_handlers.img_data import Img, ImgDataset, SatImg, DenseFlowImg, SparseFlowImg
+from satprod.data_handlers.img_data import Img, ImgDataset, SatImg, FlowImg
 from satprod.data_handlers.video import Vid, SatVid, FlowVid
 from satprod.data_handlers.optical_flow import OpticalFlow
+
+from tasklog.tasklogger import init_logger
+init_logger()
 
 class App:
 
     def __init__(self):
+        #self.logger = TaskLogger().logger
+
         cd = str(os.path.dirname(os.path.abspath(__file__)))
         self.config = read_yaml(f'{cd}/../../config.yaml')
 
-        print(f'RUNNING {self.config.app}')
-
-        self.start = datetime(2019,6,9,3)
-        self.stop = datetime(2019,6,9,21)
+        logging.info(f'Running {self.config.app}')
+        
+        day = 3
+        self.start = datetime(2019,6,day,3)
+        self.stop = datetime(2019,6,day,21)
 
         self.interval = TimeInterval(self.start, self.stop)
 
@@ -26,16 +33,17 @@ class App:
         self.step = 1
 
         # when scale is lowered from 10, lower min distance in LK
-        self.scale = 100
+        self.scale = 20
         
-        self.fps = 10
+        self.fps = 6
 
         self.satname = f'{self.timestr}-{str(int(15*self.step))}min-{self.scale}sc-sat'
         self.densename = f'{self.timestr}-{str(int(15*self.step))}min-{self.scale}sc-dense'
         self.sparsename = f'{self.timestr}-{str(int(15*self.step))}min-{self.scale}sc-sparse'
         self.sparsemaskname = f'{self.timestr}-{str(int(15*self.step))}min-{self.scale}sc-sparsemask'
 
-        self.of = OpticalFlow(satVidName=self.satname, interval=self.interval, step=self.step)
+        self.of = OpticalFlow(
+            satVidName=self.satname, interval=self.interval, step=self.step, scale=self.scale)
 
     def satvid(self):
         '''
@@ -59,7 +67,7 @@ class App:
         self.of.farneback(fb_params)
     
         dv = FlowVid(ImgType.DENSE, self.densename, self.interval, self.step)
-        dv.play(self.densename, fps=self.fps)
+        #dv.play(self.densename, fps=self.fps)
 
     def sparseflow(self):
 
@@ -91,7 +99,7 @@ class App:
         sv = FlowVid(ImgType.SPARSE, self.sparsename, self.interval, self.step)
         sv.play(self.sparsename, fps=self.fps)
 
-        smv = FlowVid(ImgType.SPARSEMASK, self.sparsemaskname, self.interval, self.step)
+        #smv = FlowVid(ImgType.SPARSEMASK, self.sparsemaskname, self.interval, self.step)
         #smv.play(self.sparsemaskname, fps=self.fps)
 
 

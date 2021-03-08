@@ -1,9 +1,13 @@
 import os
 import cv2
 import numpy as np
+import pandas as pd
+
 from satprod.data_handlers.img_data import ImgDataset
-from satprod.configs.config_utils import ImgType, TimeInterval
-from satprod.data_handlers.utils import scaler
+from satprod.configs.config_utils import ImgType, TimeInterval, read_yaml
+from satprod.data_handlers.data_utils import scaler
+
+from tasklog.tasklogger import logging
 
 class OpticalFlow():
     '''
@@ -20,7 +24,7 @@ class OpticalFlow():
         cv2.DualTVL1OpticalFlow.calc()
     '''
 
-    def __init__(self, satVidName: str, interval: TimeInterval, step: int=1):
+    def __init__(self, satVidName: str, interval: TimeInterval, step: int=1, scale: int=100):
         cd = str(os.path.dirname(os.path.abspath(__file__)))
         self.root = f'{cd}/../../..'
 
@@ -28,6 +32,7 @@ class OpticalFlow():
 
         self.name = satVidName
         self.step = step
+        self.scale = scale
 
         # Get satellite image paths to mimic them
         data = ImgDataset(ImgType.SAT)
@@ -37,8 +42,6 @@ class OpticalFlow():
         self.stop_idx = data.getDateIdx(interval.stop)
         self.img_paths = data.img_paths[self.start_idx+step:self.stop_idx+step]
         self.timestamps = data.timestamps[self.start_idx+step:self.stop_idx+step]
-
-        del data
 
         self.dense_img_paths = []
         self.sparse_img_paths = []
@@ -53,8 +56,34 @@ class OpticalFlow():
             os.makedirs('/'.join(new_dense_path.split('/')[:-1]), exist_ok=True)
             os.makedirs('/'.join(new_sparse_path.split('/')[:-1]), exist_ok=True)
             os.makedirs('/'.join(new_sparsemask_path.split('/')[:-1]), exist_ok=True)
+        
+        self.direction_df = pd.DataFrame(
+            columns = ['vals', 'yvik', 'bess', 'skom'],
+            index = self.timestamps
+        )
+        #logging.info(self.direction_df)
+
+        logging.info(f'Object for optical flow on {self.name} initialised.')
+
+    def get_degrees(self, ang_img):
+
+        # positions of parks in full scale image
+        positions = {'vals': (200,460), 'yvik': (75, 580), 'bess': (135, 590), 'skom': (140, 600)}
+        
+        # update positions to be correct for the scaled image
+        for key, value in positions.items():
+            positions[key] = (int(np.round(value[0]*self.scale/100)), int(np.round(value[1]*self.scale/100)))
+        
+        # extract degrees from angle image obtained by Farneback and cartToPolar
+        degrees = {'vals': 0, 'yvik': 0, 'bess': 0, 'skom': 0}
+        for key, value in positions.items():
+            degrees[key] = int(360-2*ang_img[value[0],value[1]])
+        return degrees
 
     def farneback(self, fb_params):
+        logging.info('Running Farneback optical flow.')
+        logging.info(f'Images every {self.step*15} minutes between {self.timestamps[0]} and {self.timestamps[-1]} are used.')
+        
         cap = cv2.VideoCapture(os.path.join(self.videopath, self.name+'.avi'))
 
         _, frame1 = cap.read()
@@ -67,15 +96,24 @@ class OpticalFlow():
             #print(counter)
             _, frame2 = cap.read()
             if frame2 is not None: 
+                logging.info(f'{self.timestamps[counter]}')
                 next = cv2.cvtColor(frame2,cv2.COLOR_BGR2GRAY)
+                #cv2.imwrite(f'gray_{counter}.png', frame2)
 
                 #flow = cv2.calcOpticalFlowFarneback(prvs,next, None, 0.5, 3, 15, 3, 5, 1.2, 0)
-                flow = cv2.calcOpticalFlowFarneback(prvs,next, None, **fb_params)
+                flow = cv2.calcOpticalFlowFarneback(prvs, next, None, **fb_params)
                 
                 mag, ang = cv2.cartToPolar(flow[...,0], flow[...,1])
                 hsv[...,0] = ang*180/np.pi/2
                 hsv[...,2] = cv2.normalize(mag,None,0,255,cv2.NORM_MINMAX)
                 rgb = cv2.cvtColor(hsv,cv2.COLOR_HSV2BGR)
+
+                #cv2.imwrite(f'ang_{counter}.png', ang*180/np.pi/2)
+                degrees = self.get_degrees(ang*180/np.pi/2)
+                for key, value in degrees.items():
+                    self.direction_df.loc[f'{self.timestamps[counter]}'][key] = value
+
+                #logging.info(degrees)
 
                 '''cv2.imwrite(f'flow0_{counter}.png',scaler(flow[...,0], 0, 255))
                 cv2.imwrite(f'flow1_{counter}.png',scaler(flow[...,1], 0, 255))
@@ -101,6 +139,8 @@ class OpticalFlow():
 
         cap.release()
         cv2.destroyAllWindows()
+        self.direction_df.to_csv(f'{self.root}/data/{self.name}.csv')
+        logging.info('Finished running Farneback optical flow.')
 
     def lukasKanade(self, feature_params, lk_params):
         cap = cv2.VideoCapture(os.path.join(self.videopath, self.name+'.avi'))

@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 import os
 import cv2
-from satprod.data_handlers.img_data import ImgDataset, SatImg, DenseFlowImg, SparseFlowImg, SparseFlowMaskImg
+from satprod.data_handlers.img_data import ImgDataset, SatImg, FlowImg
 from satprod.configs.config_utils import ImgType, TimeInterval
 
 class Vid():
@@ -20,7 +20,7 @@ class Vid():
         
         Input parameters:
             name: filename of the video, should be on the form 'filename.avi',
-            img_array: array of images of type SatImg, DenseFlowImg or SparseImg
+            img_array: array of images of type SatImg or FlowImg
 
         Output parameters:
             None
@@ -114,8 +114,6 @@ class SatVid(Vid):
         self.timestamps = data.timestamps
         self.getDateIdx = data.getDateIdx
 
-        del data
-
         self.name = name
         self.interval = interval
         self.scale = scale
@@ -177,8 +175,6 @@ class FlowVid(Vid):
         self.timestamps = data.timestamps
         self.getDateIdx = data.getDateIdx
 
-        del data
-
         self.name = name
         self.interval = interval
         self.step = step
@@ -210,62 +206,11 @@ class FlowVid(Vid):
             # Read image from file
             img = cv2.imread(self.img_paths[i])
 
-            # Create DenseFlowImg/SparseFlowImg object from image and add to list
-            if self.imgType==ImgType.DENSE:
-                img_array.append(DenseFlowImg(img, self.timestamps[i]))
-            elif self.imgType==ImgType.SPARSE:
-                img_array.append(SparseFlowImg(img, self.timestamps[i]))
-            elif self.imgType==ImgType.SPARSEMASK:
-                img_array.append(SparseFlowMaskImg(img, self.timestamps[i]))
+            # Create FlowImg object from image and add to list
+            if self.imgType!=ImgType.SAT:
+                img_array.append(FlowImg(img, self.timestamps[i], self.imgType))
             else:
                 print('ERROR: Use SatVid object for ImgType.SAT images.')
                 exit()
 
         return img_array
-
-
-if __name__=='__main__':
-    start = datetime(2019,6,3,3)
-    stop = datetime(2019,6,3,21)
-    fps = 4
-    name = '3jun2019-60min-100sc-sat'
-
-    interval = TimeInterval(start, stop)
-    v = SatVid(name=name, interval=interval, step=4)
-    v.play(name=name, fps=fps)
-
-'''if __name__=='__main__':
-    v = SatVid()
-    
-    start = datetime(2019,6,3,3)#datetime(2018,6,28,6)
-    stop = datetime(2019,6,3,21)#datetime(2018,6,28,18)
-
-    name = f'test60min1.avi'
-    #v.delete(name)
-
-    scale = 15
-
-    v.create(name, start, stop, True, scale)
-    v.play(name, 1.5)
-
-    of = OpticalFlow(root, name)
-    #of.lukasKanade(f'.')
-
-    foldername = 'ex60min10scale2'
-    os.makedirs(f'{foldername}', exist_ok=True)
-    of.farneback(f'{foldername}')
-
-    #v.delete(name)
-
-    for i in range(12):
-        start += timedelta(hours=1)
-        stop = start + timedelta(hours=2)
-        name = f'take_{i}.avi'
-        #v.delete(name)
-        v.create(name, start, stop, True, scale)
-        #v.play(name, 0.5)
-
-        of = OpticalFlow(root, name)
-        os.makedirs(f'{foldername}/{i}', exist_ok=True)
-        of.lukasKanade(f'{foldername}/{i}')
-        v.delete(name)'''
