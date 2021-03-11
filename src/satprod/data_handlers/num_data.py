@@ -2,7 +2,10 @@ import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
 import os
+
 from satprod.data_handlers.data_utils import sin_transform, cos_transform
+
+from tasklog.tasklogger import logging
 
 def read_wind_data(path):
     '''
@@ -14,7 +17,7 @@ def read_wind_data(path):
 
     Returns a dataframe containing wind speed and wind direction for each park.
     '''
-    print('Reading wind data.')
+    logging.info('Reading wind data.')
 
     # treat inf values as NaN
     pd.options.mode.use_inf_as_na = True
@@ -66,7 +69,7 @@ def read_wind_data(path):
     for park in parks:
         df = direction_transforms(df, park)
 
-    print('Done reading wind data.')
+    logging.info('Done reading wind data.')
     return df
 
 def read_production_data(path: str):
@@ -75,7 +78,7 @@ def read_production_data(path: str):
 
     Returns a dataframe containing hourly production at each park.
     '''
-    print('Reading production data.')
+    logging.info('Reading production data.')
 
     # read raw production data
     bess_prod = pd.read_csv(f'{path}/bess_prod.csv')
@@ -107,7 +110,7 @@ def read_production_data(path: str):
     # due to clearly untrue values, certain production values at yvik are removed
     df.production_yvik.loc['2019-12-16 10:00:00':] = np.nan
     
-    print('Done reading production data.')
+    logging.info('Done reading production data.')
     return df
 
 def format_numeric_data(path: str, pred_limit: int = 6):
@@ -134,7 +137,7 @@ def format_numeric_data(path: str, pred_limit: int = 6):
     # stop writing warning to console concerning potential copying error not relevant in this case
     pd.options.mode.chained_assignment = None
 
-    print('Formatting data.')
+    logging.info('Formatting data.')
     
     # convert the date_forecast columns to contain an integer represeting number of hours ahead of calculation
     wind_df['date_forecast'] = wind_df['date_forecast'] - wind_df['date_calc']
@@ -153,7 +156,7 @@ def format_numeric_data(path: str, pred_limit: int = 6):
     # in case of more than pred_limit rows with nan values, we only want to fill up to pred_limit
     #nan_row_counter = 0
 
-    print('Filling wind prediction dataframe using forecasts.')
+    logging.info('Filling wind prediction dataframe using forecasts.')
 
     for j in range(len(wind_df.columns.levels[0].values)):
         arr = wind_df[str(wind_df.columns.levels[0].values[j])].values
@@ -165,10 +168,10 @@ def format_numeric_data(path: str, pred_limit: int = 6):
 
         wind_df[str(wind_df.columns.levels[0].values[j])] = arr
 
-        print('Done with', wind_df.columns.levels[0].values[j])
+        logging.info('Done with', wind_df.columns.levels[0].values[j])
 
-    print('Done filling wind prediction dataframe.')
-    print('Creating new dataframes.')
+    logging.info('Done filling wind prediction dataframe.')
+    logging.info('Creating new dataframes.')
     # data input to decoder
     dec_df = wind_df.copy()
     for col in dec_df.columns:
@@ -186,7 +189,7 @@ def format_numeric_data(path: str, pred_limit: int = 6):
     # concat wind data and production data and store in encoder dataframe
     enc_df = pd.concat([enc_df, prod_df], axis=1)
 
-    print('Done formatting data.')
+    logging.info('Done formatting data.')
 
     return enc_df, dec_df
 
@@ -194,7 +197,7 @@ def write_formatted_data_inc_nan(enc_df_inc_nan, dec_df_inc_nan, path: str):
     '''
     Write enc_df and dec_df to file, the versions where missing data is not filled.
     '''
-    print('Writing formatted data to file.')
+    logging.info('Writing formatted data to file.')
 
     enc_df_inc_nan.to_csv(f'{path}/enc_df_inc_nan.csv')
     dec_df_inc_nan.to_csv(f'{path}/dec_df_inc_nan.csv')
@@ -203,7 +206,7 @@ def write_formatted_data_no_nan(enc_df_no_nan, dec_df_no_nan, path: str):
     '''
     Write enc_df and dec_df to file, the versions where missing data is filled.
     '''
-    print('Writing formatted data to file.')
+    logging.info('Writing formatted data to file.')
 
     enc_df_no_nan.to_csv(f'{path}/enc_df_no_nan.csv')
     dec_df_no_nan.to_csv(f'{path}/dec_df_no_nan.csv')

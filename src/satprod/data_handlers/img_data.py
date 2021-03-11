@@ -12,6 +12,8 @@ import cv2
 from satprod.data_handlers.data_utils import datetime2path, path2datetime
 from satprod.configs.config_utils import ImgType
 
+from tasklog.tasklogger import logging
+
 class Img():
     '''
     Parent class for all images.
@@ -20,8 +22,7 @@ class Img():
 
     Children:
         SatImg: the original satellite images.
-        DenseFlowImg: the result of using dense optical flow on the original images.
-        SparseFlowImg: the result of using sparse optical flow on the original images.
+        FlowImg: result image of using optical flow on a SatImg.
     '''
 
     def __init__(self, img, date: datetime):
@@ -32,42 +33,64 @@ class Img():
         self.dim = (self.width, self.height)
 
     def display(self):
+        '''
+        Display image.
+        '''
         plt.imshow(self.img)
         plt.show()
 
     def asTensor(self):
+        '''
+        Transfroms image into tensor. (Returns new tensor object, 
+        does not change img instance of class.
+        '''
         toTensor = torchvision.transforms.ToTensor()
         return toTensor(self.img)
 
 
 class SatImg(Img):
     '''
-    Child of the Img parent class.
-    Adds the ability the be resized and simplified.
+    Adds the ability the be resized and simplified, and the object variable imgType=ImgType.SAT.
     '''
+
+    def __init__(self, img, date: datetime):
+        super().__init__(img, date)
+        self.imgType = ImgType.SAT
     
-    def resize(self, scale_percent=5, interp=cv2.INTER_AREA):
-        width = int(self.width * scale_percent / 100)
-        height = int(self.height * scale_percent / 100)
-        dim = (width, height)
-        self.img = cv2.resize(self.img, dim, interpolation = interp)
-        self.width = width
-        self.height = height
-        self.dim = dim
+    def resize(self, scale_percent=20, interp=cv2.INTER_AREA):
+        # find new dimensions for the scaled image
+        self.width = int(self.width * scale_percent / 100)
+        self.height = int(self.height * scale_percent / 100)
+        self.dim = (self.width, self.height)
+
+        # resize image
+        self.img = cv2.resize(self.img, self.dim, interpolation = interp)
 
     def simplify(self, onlyBackground=False):
-        blur = cv2.GaussianBlur(self.img, (15, 15), 2)
+        '''
+        Transforms the image into an image of three colors, depending on how white the
+        pixels are. Since clouds are whiter than the background, the background is 
+        turned into black. Light clouds are dark gray, and dense clouds are white.
 
+        Input parameters:
+            onlyBackground: if True, only the background is made black, the rest isn't changed.
+        '''
+        # get smoother lines by blurring
+        blur = cv2.GaussianBlur(self.img, (15, 15), 2)
+        
+        # define colors of the new image
         white = [255,255,255]
         black = [0,0,0]
         darkgray = [90,90,90]
         gray = [120,120,120]
 
+        # transform background to black
         lower = np.array(darkgray)
         upper = np.array(white)
         mask = cv2.inRange(blur, lower, upper)
         masked_img = cv2.bitwise_and(self.img, self.img, mask=mask)
 
+        # color the clouds depending on how white they are
         if not onlyBackground:
             height, width, _ = masked_img.shape
 
@@ -80,11 +103,21 @@ class SatImg(Img):
                         if all(channels_xy > black):
                             masked_img[y,x] = darkgray
         
+        # change the original image to the masked
         self.img = masked_img
 
 class FlowImg(Img):
+    '''
+    An image represeting an optical flow result.
+
+    Parameters:
+        img: array of pixels (also in Img class)
+        date: date and time image is taken (also in Img class)
+        imgType: either of type DENSE, SPARSE, or SPARSEMASK
+    '''
     def __init__(self, img, date: datetime, imgType: ImgType):
         super().__init__(img, date)
+        assert imgType is not ImgType.SAT, 'The image should be a SatImg object, not FlowImg.'
         self.imgType = imgType
 
 class ImgDataset(torch.utils.data.Dataset):
@@ -99,6 +132,7 @@ class ImgDataset(torch.utils.data.Dataset):
 
         self.imgType = imgType
 
+        # define where to get the images depending on the image type
         if self.imgType==ImgType.DENSE: folder='dense_flow'
         elif self.imgType==ImgType.SPARSE: folder='sparse_flow'
         elif self.imgType==ImgType.SPARSEMASK: folder='sparse_flow_mask'
@@ -115,13 +149,15 @@ class ImgDataset(torch.utils.data.Dataset):
                 path2datetime(self.img_paths[i][len(self.imgroot):]) for i in range(len(self.img_paths))
             ]
         except:
-            print('ERROR: Cannot call dataset of dense and sparse optical flow images when there are none.')
+            logging.warning('Cannot call dataset of dense and sparse optical flow images when there are none.')
             exit()
 
     def __getitem__(self, idx: int):
+        # read image from path, and get its corresponding timestamp
         img = cv2.imread(self.img_paths[idx],1)
         date = self.timestamps[idx]
 
+        # return the correct imagetype
         if self.imgType!=ImgType.SAT: return FlowImg(img, date, self.imgType)
         else: return SatImg(img, date)
 

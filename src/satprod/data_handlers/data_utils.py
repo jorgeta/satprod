@@ -61,4 +61,16 @@ def cos_transform(values):
     return np.cos(2*np.pi*values/360)
 
 def scaler(arr, min_val: float=0.0, max_val: float=1.0):
+    '''
+    Scales the input array so that it has the desired minimum and maximum value.
+
+    Input parameters:
+        arr: array for scaling
+        min_val: minimum value of the returned scaled array
+        max_val: maximum value of the returned scaled array
+    
+    Output parameters:
+        scaled array
+    '''
+    
     return np.interp(arr, (np.min(arr), np.max(arr)), (min_val, max_val))

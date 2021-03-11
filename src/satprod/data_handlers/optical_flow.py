@@ -18,13 +18,22 @@ class OpticalFlow():
         Farneback (cv2.calcOpticalFlowFarneback())
         Lukas-Kanade (cv2.calcOpticalFlowPyrLK())
 
-    Coming:
+    Possible future methods:
         Horn-Schunck (?)
         cv2.SparseOpticalFlow.calc()
         cv2.DualTVL1OpticalFlow.calc()
     '''
 
     def __init__(self, satVidName: str, interval: TimeInterval, step: int=1, scale: int=100):
+        '''
+        Input parameters:
+            satVidName: filename of the satellite video to do optical flow on
+            interval: TimeInterval giving first and last image of the video,
+            scale: scaling used when creating the video satVidName
+            step: if 1, use all images, if 2, every second.
+                Included in order to know what image is the first one with flow results
+        '''
+
         cd = str(os.path.dirname(os.path.abspath(__file__)))
         self.root = f'{cd}/../../..'
 
@@ -42,119 +51,139 @@ class OpticalFlow():
         self.stop_idx = data.getDateIdx(interval.stop)
         self.img_paths = data.img_paths[self.start_idx+step:self.stop_idx+step]
         self.timestamps = data.timestamps[self.start_idx+step:self.stop_idx+step]
-
-        self.dense_img_paths = []
-        self.sparse_img_paths = []
-        self.sparsemask_img_paths = []
-        for i in range(0, len(self.img_paths), step):
-            new_dense_path = self.img_paths[i].replace('/img/', f'/dense_flow/')
-            new_sparse_path = self.img_paths[i].replace('/img/', f'/sparse_flow/')
-            new_sparsemask_path = self.img_paths[i].replace('/img/', f'/sparse_flow_mask/')
-            self.dense_img_paths.append(new_dense_path)
-            self.sparse_img_paths.append(new_sparse_path)
-            self.sparsemask_img_paths.append(new_sparsemask_path)
-            os.makedirs('/'.join(new_dense_path.split('/')[:-1]), exist_ok=True)
-            os.makedirs('/'.join(new_sparse_path.split('/')[:-1]), exist_ok=True)
-            os.makedirs('/'.join(new_sparsemask_path.split('/')[:-1]), exist_ok=True)
         
+        # initialise dataframes for storing results of dense optical flow
         self.direction_df = pd.DataFrame(
             columns = ['vals', 'yvik', 'bess', 'skom'],
             index = self.timestamps
         )
-        #logging.info(self.direction_df)
+        self.magnitude_df = pd.DataFrame(
+            columns = ['vals', 'yvik', 'bess', 'skom'],
+            index = self.timestamps
+        )
+        
+        # positions of parks in full scale image (see notebook park_pixel_positions.ipynb)
+        self.positions = {'vals': (200,460), 'yvik': (75, 580), 'bess': (135, 590), 'skom': (140, 600)}
+        
+        # update positions to be correct for the scaled image
+        for key, value in self.positions.items():
+            self.positions[key] = (
+                int(np.round(value[0]*self.scale/100)), int(np.round(value[1]*self.scale/100)))
 
         logging.info(f'Object for optical flow on {self.name} initialised.')
 
-    def get_degrees(self, ang_img):
+    def get_degrees(self, ang_img) -> dict:
+        '''
+        Extract degrees from angle image obtained by Farneback and cartToPolar.
+        '''
 
-        # positions of parks in full scale image
-        positions = {'vals': (200,460), 'yvik': (75, 580), 'bess': (135, 590), 'skom': (140, 600)}
-        
-        # update positions to be correct for the scaled image
-        for key, value in positions.items():
-            positions[key] = (int(np.round(value[0]*self.scale/100)), int(np.round(value[1]*self.scale/100)))
-        
-        # extract degrees from angle image obtained by Farneback and cartToPolar
         degrees = {'vals': 0, 'yvik': 0, 'bess': 0, 'skom': 0}
-        for key, value in positions.items():
+        for key, value in self.positions.items():
             degrees[key] = int(360-2*ang_img[value[0],value[1]])
         return degrees
+    
+    def get_magnitude(self, mag_img) -> dict:
+        '''
+        Extract magnutide/speed from magnitude image obtained by Farneback and cartToPolar.
+        '''
+
+        magnitudes = {'vals': 0, 'yvik': 0, 'bess': 0, 'skom': 0}
+        for key, value in self.positions.items():
+            magnitudes[key] = mag_img[value[0],value[1]]
+        return magnitudes
 
     def farneback(self, fb_params):
         logging.info('Running Farneback optical flow.')
+        logging.info(f'Farneback params:\n {fb_params}.')
         logging.info(f'Images every {self.step*15} minutes between {self.timestamps[0]} and {self.timestamps[-1]} are used.')
         
+        # initialise and create where the results should be stored
+        self.dense_img_paths = []
+        for i in range(0, len(self.img_paths), self.step):
+            dp = self.img_paths[i].replace('/img/', f'/dense_flow/')
+            self.dense_img_paths.append(dp)
+            os.makedirs('/'.join(dp.split('/')[:-1]), exist_ok=True)
+
+        # get satellite image video
         cap = cv2.VideoCapture(os.path.join(self.videopath, self.name+'.avi'))
 
+        # get first image in the video, and store it to prvs (previous)
         _, frame1 = cap.read()
         prvs = cv2.cvtColor(frame1,cv2.COLOR_BGR2GRAY)
+        
+        # initialise hsv image (results are a series of these)
         hsv = np.zeros_like(frame1)
         hsv[...,1] = 255
 
         counter = 0
         while(1):
-            #print(counter)
+            # retrieving next image in satellite image video
             _, frame2 = cap.read()
             if frame2 is not None: 
-                logging.info(f'{self.timestamps[counter]}')
+                logging.info(f'Performing dense optical flow at for time {self.timestamps[counter]}')
+                
+                # grayscaling newest image
                 next = cv2.cvtColor(frame2,cv2.COLOR_BGR2GRAY)
-                #cv2.imwrite(f'gray_{counter}.png', frame2)
 
-                #flow = cv2.calcOpticalFlowFarneback(prvs,next, None, 0.5, 3, 15, 3, 5, 1.2, 0)
+                # perform farneback optical flow
                 flow = cv2.calcOpticalFlowFarneback(prvs, next, None, **fb_params)
                 
+                # create hsv image from algorithm result
                 mag, ang = cv2.cartToPolar(flow[...,0], flow[...,1])
                 hsv[...,0] = ang*180/np.pi/2
                 hsv[...,2] = cv2.normalize(mag,None,0,255,cv2.NORM_MINMAX)
                 rgb = cv2.cvtColor(hsv,cv2.COLOR_HSV2BGR)
 
-                #cv2.imwrite(f'ang_{counter}.png', ang*180/np.pi/2)
+                # registering wind direction estimate at park positions
                 degrees = self.get_degrees(ang*180/np.pi/2)
                 for key, value in degrees.items():
                     self.direction_df.loc[f'{self.timestamps[counter]}'][key] = value
 
-                #logging.info(degrees)
+                # registering wind speed estimate at park positions
+                magnitudes = self.get_magnitude(mag)
+                for key, value in magnitudes.items():
+                    self.magnitude_df.loc[f'{self.timestamps[counter]}'][key] = value
 
-                '''cv2.imwrite(f'flow0_{counter}.png',scaler(flow[...,0], 0, 255))
-                cv2.imwrite(f'flow1_{counter}.png',scaler(flow[...,1], 0, 255))
-                cv2.imwrite(f'mag_{counter}.png',scaler(mag, 0, 255))
-                cv2.imwrite(f'ang_{counter}.png',scaler(ang, 0, 255))'''
-
-                #cv2.imshow('frame2',rgb)
-                #k = cv2.waitKey(30) & 0xff
-                #if k == 27:
-                    #break
-                #elif k == ord('s'):
-                #cv2.imwrite(f'{save}/opticalfb_{counter}.png',frame2)
-                #cv2.imwrite(f'{save}/opticalhsv_{counter}.png',rgb)
+                # save result image to data folder
                 cv2.imwrite(self.dense_img_paths[counter],rgb)
                 prvs = next
             else:
-                #cv2.imwrite('opticalfb.png',frame2)
-                #cv2.imwrite('opticalhsv.png',rgb)
+                # no images left in the satellite image video, so the algorithm is stopped
                 cap.release()
                 cv2.destroyAllWindows()
                 break
             counter += 1
 
+        # repetition of release and destroy calls for safety
         cap.release()
         cv2.destroyAllWindows()
-        self.direction_df.to_csv(f'{self.root}/data/{self.name}.csv')
+
+        # store results at park positions to csv files named after the satellite image video name
+        os.makedirs(f'{self.root}/data/direction_dfs', exist_ok=True)
+        os.makedirs(f'{self.root}/data/magnitude_dfs', exist_ok=True)
+        self.direction_df.to_csv(f'{self.root}/data/direction_dfs/{self.name}.csv')
+        self.magnitude_df.to_csv(f'{self.root}/data/magnitude_dfs/{self.name}.csv')
+
         logging.info('Finished running Farneback optical flow.')
 
-    def lukasKanade(self, feature_params, lk_params):
+    def lucasKanade(self, feature_params, lk_params):
+        logging.info('Running Lucas-Kanade optical flow.')
+        logging.info(f'Feature params:\n {feature_params}.')
+        logging.info(f'Lucas-Kanade params:\n {lk_params}.')
+        logging.info(f'Images every {self.step*15} minutes between {self.timestamps[0]} and {self.timestamps[-1]} are used.')
+
+        # initialise and create where the results should be stored
+        self.sparse_img_paths = []
+        self.sparsemask_img_paths = []
+        for i in range(0, len(self.img_paths), self.step):
+            nsp = self.img_paths[i].replace('/img/', f'/sparse_flow/')
+            nsmp = self.img_paths[i].replace('/img/', f'/sparse_flow_mask/')
+            self.sparse_img_paths.append(nsp)
+            self.sparsemask_img_paths.append(nsmp)
+            os.makedirs('/'.join(nsp.split('/')[:-1]), exist_ok=True)
+            os.makedirs('/'.join(nsmp.split('/')[:-1]), exist_ok=True)
+
         cap = cv2.VideoCapture(os.path.join(self.videopath, self.name+'.avi'))
-
-        '''# params for ShiTomasi corner detection
-        feature_params = dict( maxCorners = 100,#100,
-                            qualityLevel = 0.05,#0.3,
-                            minDistance = 14,
-                            blockSize = 7 )
-
-        # Parameters for lucas kanade optical flow
-        lk_params = dict( winSize  = (15,15),#(15,15),
-                        maxLevel = 2,
-                        criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))'''
 
         # Create some random colors
         color = np.random.randint(0,255,(100,3))
@@ -168,10 +197,13 @@ class OpticalFlow():
         mask = np.zeros_like(old_frame)
 
         counter = 0
-
         while(1):
+            # retrieving next image in satellite image video
             _, frame = cap.read()
             if frame is not None:
+                logging.info(f'Performing sparse optical flow at for time {self.timestamps[counter]}')
+                
+                # grayscaling newest image
                 frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
                 # calculate optical flow
@@ -179,7 +211,7 @@ class OpticalFlow():
 
                 # Select good points
                 if p1 is None:
-                    print('ERROR: Lucas Kanade method failed, could ot find any new good points.')
+                    logging.error('Lucas Kanade method failed, could ot find any new good points.')
                     exit()
                 
                 good_new = p1[st==1]
@@ -193,21 +225,17 @@ class OpticalFlow():
                     frame = cv2.circle(frame,(a,b),1,color[i].tolist(),-1)
                 img = cv2.add(frame, mask)
 
-                #cv2.imshow('frame',img)
-                #cv2.imwrite(f'{save}/opticalfeatures_{counter}.png',img)
-                #cv2.imwrite(f'{save}/opticalmask_{counter}.png',mask)
+                # write results to data folder
                 cv2.imwrite(self.sparse_img_paths[counter],img)
                 cv2.imwrite(self.sparsemask_img_paths[counter],mask)
-
-                #k = cv2.waitKey(30) & 0xff
-                #if k == 27:
-                #    break
 
                 # Now update the previous frame and previous points
                 old_gray = frame_gray.copy()
                 p0 = good_new.reshape(-1,1,2)
             else:
                 break
+            
+            # handle different density of images over time, only update good features every 60 minutes
             if (self.step == 4) or \
                 (self.step == 1 and (counter+1) % 4 == 0) or \
                 (self.step == 2 and (counter-1) % 2 == 0):
@@ -217,3 +245,5 @@ class OpticalFlow():
 
         cv2.destroyAllWindows()
         cap.release()
+
+        logging.info('Finished running Lucas-Kanade optical flow.')

@@ -4,7 +4,18 @@ import cv2
 from satprod.data_handlers.img_data import ImgDataset, SatImg, FlowImg
 from satprod.configs.config_utils import ImgType, TimeInterval
 
+from tasklog.tasklogger import logging
+
 class Vid():
+    '''
+    Parent class for all videos.
+
+    Children:
+        SatVid: video of the original satellite images.
+            Puts together a list of images for the create function.
+        FlowVid: video of the images obtained by using optical flow on satellite image videos.
+            Puts together a list of images for the create function.
+    '''
 
     def __init__(self):
 
@@ -94,6 +105,56 @@ class Vid():
         '''
         os.remove(os.path.join(self.videopath, name+'.avi'))
 
+    def get_img_array(
+        self, interval: TimeInterval, imgType: ImgType, getDateIdx, img_paths, timestamps,
+        scale: int=100, simplify: bool=False, step: int=1):
+        '''
+        Write image series to file as a video.
+        The created videofile is found in 'videopath'.
+        
+        Input parameters:
+            interval: TimeInterval giving first and last image of the video,
+            imgType: ImgType (SAT / DENSE / SPARSE / SPARSEMASK)
+            getDateIdx: function for looking up index in dataset of images corresponding to imgType
+            img_paths: paths to the desired images for the video
+            timestamps: corresponding timestamps to the images in the img_paths
+            scale: percent of image used, scale=100 means no change,
+            simplify: whether to make the background black and clouds plain white,
+            step: skip step-1 images in the series
+        
+        Output parameters:
+            img_array: array of images for the video
+        '''
+
+        # Get indices of images using the dates
+        if imgType is not ImgType.SAT:
+            self.start_idx = getDateIdx(interval.start+timedelta(minutes=15)*step)
+        else:
+            self.start_idx = getDateIdx(interval.start)
+        self.stop_idx = getDateIdx(interval.stop)
+
+        # Create array of the images that will become the video
+        img_array = []
+        for i in range(self.start_idx, self.stop_idx+1, step):
+            # Read image from file
+            img = cv2.imread(img_paths[i])
+            
+            if imgType==ImgType.SAT:
+                # Create SatImg object from image
+                satimg = SatImg(img, timestamps[i])
+
+                # Simplify image
+                if simplify: satimg.simplify()
+                
+                # Scale image (downscaling if scale < 100)
+                satimg.resize(scale_percent=scale)
+            
+                img_array.append(satimg)
+            else:
+                img_array.append(FlowImg(img, timestamps[i], imgType))
+
+        return img_array
+
 
 class SatVid(Vid):
     '''
@@ -105,6 +166,8 @@ class SatVid(Vid):
     def __init__(self, name: str, interval: TimeInterval, 
                  scale: int=100, simplify: bool=False, step: int=1):
         super().__init__()
+
+        logging.info(f'Initialising SatVid object with name {name}, interval {interval}, scale {scale}, simplification {simplify}, and step{step}.')
         
         self.imgType = ImgType.SAT
         
@@ -120,52 +183,32 @@ class SatVid(Vid):
         self.simplify = simplify
         self.step = step
 
-        self.img_array = self.get_img_array()
+        self.img_array = self.get_img_array(
+            self.interval,
+            self.imgType,
+            self.getDateIdx,
+            self.img_paths,
+            self.timestamps,
+            self.scale,
+            self.simplify,
+            self.step
+        )
 
+    def save(self):
+        '''
+        Create a video of the image array and save it to file.
+        '''
+        logging.info('Saving satellite image video to file.')
+        logging.info(f'Video name: {self.name}')
+        logging.info(f'Video interval: {self.interval}')
         self.create(self.name, self.img_array)
-    
-    def get_img_array(self):
-        '''
-        Write image series to file as a video.
-        The created videofile is found in 'videopath'.
-        
-        Input parameters:
-            interval: TimeInterval giving first and last image of the video,
-            scale: percent of image used, scale=100 means no change,
-            simplify: whether to make the background black and clouds plain white,
-            step: skip step-1 images in the series
-        
-        Output parameters:
-            img_array: array of images for the video
-        '''
-
-        # Get indices of images using the dates
-        self.start_idx = self.getDateIdx(self.interval.start)
-        self.stop_idx = self.getDateIdx(self.interval.stop)
-
-        # Create array of the images that will become the video
-        img_array = []
-        for i in range(self.start_idx, self.stop_idx+1, self.step):
-            # Read image from file
-            img = cv2.imread(self.img_paths[i])
-
-            # Create SatImg object from image
-            satimg = SatImg(img, self.timestamps[i])
-
-            # Simplify image
-            if self.simplify: satimg.simplify()
-            
-            # Scale image (downscaling if scale < 100)
-            satimg.resize(scale_percent=self.scale)
-            
-            img_array.append(satimg)
-
-        return img_array
 
 class FlowVid(Vid):
 
     def __init__(self, imgType: ImgType, name: str, interval: TimeInterval, step: int=1):
         super().__init__()
+
+        logging.info(f'Initialising FlowVid object with image type {imgType}, name {name}, interval {interval}, and step{step}.')
         
         self.imgType = imgType
 
@@ -179,38 +222,21 @@ class FlowVid(Vid):
         self.interval = interval
         self.step = step
 
-        self.img_array = self.get_img_array()
+        self.img_array = self.get_img_array(
+            self.interval,
+            self.imgType,
+            self.getDateIdx,
+            self.img_paths,
+            self.timestamps,
+            step=self.step
+        )
 
+    def save(self):
+        '''
+        Create a video of the image array and save it to file.
+        '''
+        logging.info('Saving flow video to file.')
+        logging.info(f'Image type: {self.imgType.name}')
+        logging.info(f'Video name: {self.name}')
+        logging.info(f'Video interval: {self.interval}')
         self.create(self.name, self.img_array)
-    
-    def get_img_array(self):
-        '''
-        Write image series to file as a video.
-        The created videofile is found in 'videopath'.
-        
-        Input parameters:
-            interval: TimeInterval giving first and last image of the video,
-            step: skip step-1 images in the series
-        
-        Output parameters:
-            img_array: array of images for the video
-        '''
-
-        # Get indices of images using the dates
-        self.start_idx = self.getDateIdx(self.interval.start+timedelta(minutes=15)*self.step)
-        self.stop_idx = self.getDateIdx(self.interval.stop)
-
-        # Create array of the images that will become the video
-        img_array = []
-        for i in range(self.start_idx, self.stop_idx+1, self.step):
-            # Read image from file
-            img = cv2.imread(self.img_paths[i])
-
-            # Create FlowImg object from image and add to list
-            if self.imgType!=ImgType.SAT:
-                img_array.append(FlowImg(img, self.timestamps[i], self.imgType))
-            else:
-                print('ERROR: Use SatVid object for ImgType.SAT images.')
-                exit()
-
-        return img_array
