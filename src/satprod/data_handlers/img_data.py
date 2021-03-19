@@ -113,7 +113,7 @@ class FlowImg(Img):
     Parameters:
         img: array of pixels (also in Img class)
         date: date and time image is taken (also in Img class)
-        imgType: either of type DENSE, SPARSE, or SPARSEMASK
+        imgType: represents different of methods
     '''
     def __init__(self, img, date: datetime, imgType: ImgType):
         super().__init__(img, date)
@@ -133,9 +133,7 @@ class ImgDataset(torch.utils.data.Dataset):
         self.imgType = imgType
 
         # define where to get the images depending on the image type
-        if self.imgType==ImgType.DENSE: folder='dense_flow'
-        elif self.imgType==ImgType.SPARSE: folder='sparse_flow'
-        elif self.imgType==ImgType.SPARSEMASK: folder='sparse_flow_mask'
+        if self.imgType is not ImgType.SAT: folder=imgType.value
         else: folder='img'
 
         self.imgroot = os.path.join(self.root, 'data', folder)

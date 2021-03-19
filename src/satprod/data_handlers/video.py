@@ -166,8 +166,9 @@ class SatVid(Vid):
     def __init__(self, name: str, interval: TimeInterval, 
                  scale: int=100, simplify: bool=False, step: int=1):
         super().__init__()
-
-        logging.info(f'Initialising SatVid object with name {name}, interval {interval}, scale {scale}, simplification {simplify}, and step{step}.')
+        start = interval.start.strftime('%Y-%m-%d %H:%M')
+        stop = interval.stop.strftime('%Y-%m-%d %H:%M')
+        logging.info(f'Initialising SatVid object with name {name}, interval {start, stop}, scale {scale}, simplification {simplify}, and step {step}.')
         
         self.imgType = ImgType.SAT
         
@@ -200,15 +201,18 @@ class SatVid(Vid):
         '''
         logging.info('Saving satellite image video to file.')
         logging.info(f'Video name: {self.name}')
-        logging.info(f'Video interval: {self.interval}')
+        start = self.interval.start.strftime('%Y-%m-%d %H:%M')
+        stop = self.interval.stop.strftime('%Y-%m-%d %H:%M')
+        logging.info(f'Video interval: {start, stop}')
         self.create(self.name, self.img_array)
 
 class FlowVid(Vid):
 
     def __init__(self, imgType: ImgType, name: str, interval: TimeInterval, step: int=1):
         super().__init__()
-
-        logging.info(f'Initialising FlowVid object with image type {imgType}, name {name}, interval {interval}, and step{step}.')
+        start = interval.start.strftime('%Y-%m-%d %H:%M')
+        stop = interval.stop.strftime('%Y-%m-%d %H:%M')
+        logging.info(f'Initialising FlowVid object with image type {imgType.value}, name {name}, interval {start, stop}, and step {step}.')
         
         self.imgType = imgType
 
@@ -236,7 +240,9 @@ class FlowVid(Vid):
         Create a video of the image array and save it to file.
         '''
         logging.info('Saving flow video to file.')
-        logging.info(f'Image type: {self.imgType.name}')
+        logging.info(f'Image type: {self.imgType.value}')
         logging.info(f'Video name: {self.name}')
-        logging.info(f'Video interval: {self.interval}')
+        start = self.interval.start.strftime('%Y-%m-%d %H:%M')
+        stop = self.interval.stop.strftime('%Y-%m-%d %H:%M')
+        logging.info(f'Video interval: {start, stop}')
         self.create(self.name, self.img_array)

@@ -4,7 +4,7 @@ dependencies:
   - conda=4.9.2
   - pip=21.0.1
   - python=3.7.2
-  - opencv=3.4.2
+  #- opencv=3.4.2
   - pip:
     - numpy==1.20.1
     - pandas==1.2.2
@@ -19,4 +19,5 @@ dependencies:
     - seaborn==0.11.1
     - munch==2.5.0
     - fire==0.4.0
+    - opencv-contrib-python==4.5.1.48
     - -e .

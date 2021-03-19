@@ -1,5 +1,7 @@
 from datetime import datetime
 import numpy as np
+import pandas as pd
+from sklearn import preprocessing
 
 def datetime2path(datetime: datetime) -> str:
     '''
@@ -74,3 +76,42 @@ def scaler(arr, min_val: float=0.0, max_val: float=1.0):
     '''
     
     return np.interp(arr, (np.min(arr), np.max(arr)), (min_val, max_val))
+
+def max_min_scale_df(df: pd.DataFrame) -> pd.DataFrame:
+    """[summary]
+
+    Args:
+        df (pd.DataFrame): dataframe or part of dataframe for scaling
+
+    Returns:
+        pd.DataFrame: scaled dataframe
+    """
+    x = df.values
+    min_max_scaler = preprocessing.MinMaxScaler()
+    x_scaled = min_max_scaler.fit_transform(x)
+    return pd.DataFrame(x_scaled, index = df.index, columns=df.columns)
+
+def wind_degrees_to_polar(sin, cos):
+    '''
+    Converts sine and cosine of wind direction degrees into polar coordinate degrees.
+    That is, 0 degrees means wind from west to east, 90 degrees means wind from
+    south to nord, and so on.
+    '''
+    
+    deg = np.zeros(len(cos))
+    for i in range(len(cos)):
+        if sin[i]>0:
+            deg[i] = np.arcsin(cos[i])*180/np.pi
+            if deg[i] < 0:
+                deg[i] += 360
+        elif cos[i]>0:
+            deg[i] = np.arccos(sin[i])*180/np.pi
+        else:
+            deg[i] = np.arctan(cos[i]/sin[i])*180/np.pi+180
+    return (deg+180) % 360
+
+def MAE(arr1, arr2):
+    return np.mean(np.abs(arr1-arr2))
+    
+def RMSE(arr1, arr2):
+    return np.sqrt(np.mean(np.square(arr1-arr2)))

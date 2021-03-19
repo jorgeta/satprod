@@ -18,9 +18,13 @@ def read_yaml(path: str) -> Munch:
 
 class ImgType(Enum):
     SAT = 'sat'
-    DENSE = 'dense'
-    SPARSE = 'sparse'
-    SPARSEMASK = 'sparsemask'
+    FB_DENSE = 'fb_dense'
+    LK_SPARSE = 'lk_sparse'
+    LK_SPARSEMASK = 'lk_sparsemask'
+    LK_DENSE = 'lk_dense'
+    DTVL1_DENSE = 'dtvl1_dense'
+    SF_DENSE = 'sf_dense'
+    RLOF_DENSE = 'rlof_dense'
 
 @dataclass
 class TimeInterval:
