@@ -22,7 +22,7 @@ class Vid():
         cd = str(os.path.dirname(os.path.abspath(__file__)))
         self.root = f'{cd}/../../..'
 
-        self.videopath = os.path.join(self.root, 'data/video')
+        self.videopath = os.path.join(self.root, 'data', 'video')
 
     def create(self, name: str, img_array):
         '''
@@ -45,7 +45,7 @@ class Vid():
 
         # Create videowriter object
         out = cv2.VideoWriter(
-            os.path.join(self.videopath, name+'.avi'), cv2.VideoWriter_fourcc(*'DIVX'), video_fps, size
+            os.path.join(self.videopath, img_array[0].imgType.value, name+'.avi'), cv2.VideoWriter_fourcc(*'DIVX'), video_fps, size
         )
 
         for img_obj in img_array:
@@ -68,7 +68,8 @@ class Vid():
         delay_time = int(1000/fps)
 
         # Retrieve video
-        cap = cv2.VideoCapture(os.path.join(self.videopath, name+'.avi'))
+        folder = name.split('-')[-1].replace('.avi', '')
+        cap = cv2.VideoCapture(os.path.join(self.videopath, folder, name+'.avi'))
 
         while(True):
             # Capture frame-by-frame
@@ -163,8 +164,7 @@ class SatVid(Vid):
     videos from a given range of satellite images.
     '''
 
-    def __init__(self, name: str, interval: TimeInterval, 
-                 scale: int=100, simplify: bool=False, step: int=1):
+    def __init__(self, name: str, interval: TimeInterval, scale: int=100, simplify: bool=False, step: int=1):
         super().__init__()
         start = interval.start.strftime('%Y-%m-%d %H:%M')
         stop = interval.stop.strftime('%Y-%m-%d %H:%M')

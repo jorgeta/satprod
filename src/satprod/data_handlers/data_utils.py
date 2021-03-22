@@ -115,3 +115,6 @@ def MAE(arr1, arr2):
     
 def RMSE(arr1, arr2):
     return np.sqrt(np.mean(np.square(arr1-arr2)))
+
+def get_columns(df: pd.DataFrame, keyword: str) -> pd.DataFrame:
+    return df[[col for col in df.columns if keyword in col]]

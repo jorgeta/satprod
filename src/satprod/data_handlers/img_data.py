@@ -133,8 +133,7 @@ class ImgDataset(torch.utils.data.Dataset):
         self.imgType = imgType
 
         # define where to get the images depending on the image type
-        if self.imgType is not ImgType.SAT: folder=imgType.value
-        else: folder='img'
+        folder=f'img/{imgType.value}'
 
         self.imgroot = os.path.join(self.root, 'data', folder)
         

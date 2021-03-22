@@ -19,7 +19,6 @@ class OpticalFlow():
     Methods supported:
         Farneback (dense)
         Dual TVL1 (dense)
-        SimpleFlow (dense)
         RLOF (dense)
         Lucas-Kanade (dense) 
         Lucas-Kanade (sparse)
@@ -90,16 +89,6 @@ class OpticalFlow():
                 'flags': 0
             }
         
-        # Parameters for SimpleFlow optical flow
-        if imgType==ImgType.SF_DENSE:
-            logging.warning(f'{imgType.value} works, but is extremely slow and gives meaningless results.')
-            raise NotImplementedError
-        if params is None and imgType==ImgType.SF_DENSE:
-            params = dict ( layers = 5, 
-                            averaging_block_size = 11, 
-                            max_flow = 20 
-                            )
-        
         # Parameters for Dual TVL1 optical flow
         if params is None and imgType==ImgType.DTVL1_DENSE:
             params = { 
@@ -142,7 +131,6 @@ class OpticalFlow():
             }
         
         if imgType==ImgType.FB_DENSE: self.__farneback(params=params)
-        elif imgType==ImgType.SF_DENSE: self.__simpleFlow(params=params)
         elif imgType==ImgType.DTVL1_DENSE: self.__dualTVL1(params=params)
         elif imgType==ImgType.LK_DENSE: self.__denseLucasKanade(params=params)
         elif imgType==ImgType.RLOF_DENSE: self.__RLOF(params=params)
@@ -213,7 +201,7 @@ class OpticalFlow():
     def __create_image_folder(self, name: str) -> [str]:
         paths = []
         for i in range(0, len(self.img_paths), self.step):
-            path = self.img_paths[i].replace('/img/', f'/{name}/')
+            path = self.img_paths[i].replace('/img/sat/', f'/img/{name}/')
             paths.append(path)
             os.makedirs('/'.join(path.split('/')[:-1]), exist_ok=True)
         return paths
@@ -231,14 +219,6 @@ class OpticalFlow():
         self.__dense(
             method = dtvl1.calc,
             imgType = ImgType.DTVL1_DENSE,
-            params = params,
-            gray = True
-        )
-    
-    def __simpleFlow(self, params: dict):
-        self.__dense(
-            method = cv2.optflow.calcOpticalFlowSF,
-            imgType = ImgType.SF_DENSE,
             params = params,
             gray = True
         )
@@ -269,7 +249,7 @@ class OpticalFlow():
         self.flow_img_paths = self.__create_image_folder(imgType.value)
     
         # Read the video and first frame
-        cap = cv2.VideoCapture(os.path.join(self.videopath, self.name+'.avi'))
+        cap = cv2.VideoCapture(os.path.join(self.videopath, 'sat', self.name+'.avi'))
         ret, old_frame = cap.read()
         
         # create HSV & make Value a constant
@@ -295,10 +275,7 @@ class OpticalFlow():
             if gray: new_frame = cv2.cvtColor(new_frame, cv2.COLOR_BGR2GRAY)
             
             # Calculate Optical Flow
-            #
-            if imgType==ImgType.SF_DENSE:
-                flow = method(old_frame, new_frame, **params)
-            elif imgType==ImgType.DTVL1_DENSE:
+            if imgType==ImgType.DTVL1_DENSE:
                 # does not take params as argument because they were already defined when creating the method
                 flow = method(old_frame, new_frame, None)
             else:
@@ -340,9 +317,10 @@ class OpticalFlow():
         cap.release()
         
         # store results at park positions to csv files named after the satellite image video name
-        os.makedirs(f'{self.root}/data/of_num_results', exist_ok=True)
+        path = f'{self.root}/data/of_num_results/{imgType.value}'
+        os.makedirs(path, exist_ok=True)
         
-        filename = self.name.replace('sat', imgType.value)
+        filename = self.name.replace('-sat', '')
         
         self.direction_pixel_df.columns = ['vals_deg_pixel', 'yvik_deg_pixel', 'bess_deg_pixel', 'skom_deg_pixel']
         self.direction_median_df.columns = ['vals_deg_median', 'yvik_deg_median', 'bess_deg_median', 'skom_deg_median']
@@ -350,10 +328,10 @@ class OpticalFlow():
         self.magnitude_median_df.columns = ['vals_mag_median', 'yvik_mag_median', 'bess_mag_median', 'skom_mag_median']
         
         of_results_df = pd.concat([self.direction_pixel_df, self.direction_median_df, self.magnitude_pixel_df, self.magnitude_median_df], axis=1)
-        of_results_df.to_csv(f'{self.root}/data/of_num_results/{filename}.csv')
+        of_results_df.to_csv(f'{path}/{filename}.csv')
         
         dmp = json.dumps(params)
-        f = open(f'{self.root}/data/of_num_results/{filename}_params.json','w')
+        f = open(f'{path}/{filename}_params.json','w')
         f.write(dmp)
         f.close()
 

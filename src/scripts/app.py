@@ -7,8 +7,9 @@ import logging
 from satprod.configs.config_utils import read_yaml, TimeInterval, ImgType
 from satprod.data_handlers.img_data import Img, ImgDataset, SatImg, FlowImg
 from satprod.data_handlers.video import SatVid, FlowVid
-from satprod.data_handlers.optical_flow_optim import OpticalFlowOptim
-from satprod.data_handlers.optical_flow import OpticalFlow
+from satprod.optical_flow.optical_flow_optim import OpticalFlowOptim
+from satprod.optical_flow.optical_flow import OpticalFlow
+from satprod.data_handlers.num_data import NumericalDataHandler
 
 from tasklog.tasklogger import init_logger
 init_logger()
@@ -27,6 +28,8 @@ class App:
         self.fps = 6
         
         self.of_optim = OpticalFlowOptim(self.step, self.scale, self.fps)
+        
+        self.num = NumericalDataHandler()
     
     def satvid(self, day: int, play=False):
         '''
