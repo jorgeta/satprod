@@ -31,6 +31,8 @@ class NumericalDataHandler():
         df = pd.concat([wind_df,prod_df], axis=1)
         self.write_formatted_data(df, True)
         df = self.fill_missing_values(df)
+        # drop skom wind data because they're the same as for bess
+        df = df.drop(columns=get_columns(wind_df, 'skom').columns)
         self.write_formatted_data(df, False)
     
     def write_formatted_data(self, df: pd.DataFrame, nan: bool):

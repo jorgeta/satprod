@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import numpy as np
 import pandas as pd
 from sklearn import preprocessing
@@ -118,3 +118,31 @@ def RMSE(arr1, arr2):
 
 def get_columns(df: pd.DataFrame, keyword: str) -> pd.DataFrame:
     return df[[col for col in df.columns if keyword in col]]
+
+def date2interval(date: datetime):
+    '''
+    Takes a given date and outputs the time interval of wanted images.
+    The interval is closed, so when the return value is in the example, 
+    include getting the images that were taken at 02:15 and 21:00.
+
+    Some days of the year were manually chosen and the wanted interval was saved.
+    These values were interpolated using trigonometric functions.
+    The 'magic' numbers in this function come from tuning the interpolation,
+    and the floor and ceil functions come from wanting to round to a 15th minute.
+
+    Example:
+    Input:
+        date = datetime(2020, 5, 29)
+    Output:
+        [datetime(2020, 5, 29, 2, 15), datetime(2020, 5, 29, 21, 0)]
+    '''
+    date = date.replace(hour=0, minute=0, second=0)
+    dayofyear = date.timetuple().tm_yday
+
+    upper = np.ceil(4*(17.5 + 3.5*np.sin(2*np.pi*(dayofyear-70)/(1.1*365))))/4
+    lower = np.floor(4*(6 + 4*np.cos(2*np.pi*(dayofyear+35)/(1.15*365))))/4
+    
+    start = date + timedelta(hours=int(np.floor(lower)), minutes=int(60*(lower-np.floor(lower))))
+    end = date + timedelta(hours=int(np.floor(upper)), minutes=int(60*(upper-np.floor(upper))))
+    
+    return [start, end]

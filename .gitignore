@@ -1,6 +1,6 @@
 # data
 /data
-/wind_data
+/storage
 
 # any datafile
 *.txt

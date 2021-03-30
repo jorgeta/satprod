@@ -3,11 +3,13 @@ import cv2
 import numpy as np
 import pandas as pd
 import json
+import pickle
+from datetime import datetime, timedelta
 
 from satprod.data_handlers.img_data import ImgDataset
 from satprod.data_handlers.video import FlowVid
 from satprod.configs.config_utils import ImgType, TimeInterval, read_yaml
-from satprod.data_handlers.data_utils import scaler
+from satprod.data_handlers.data_utils import scaler, date2interval
 
 from tasklog.tasklogger import logging
 
@@ -24,11 +26,10 @@ class OpticalFlow():
         Lucas-Kanade (sparse)
     '''
 
-    def __init__(self, satVidName: str, interval: TimeInterval, step: int=1, scale: int=100):
+    def __init__(self, satVidName: str, step: int=1, scale: int=100, mean_limit: int=80):
         '''
         Input parameters:
             satVidName: filename of the satellite video to do optical flow on
-            interval: TimeInterval giving first and last image of the video,
             scale: scaling used when creating the video satVidName
             step: if 1, use all images, if 2, every second.
                 Included in order to know what image is the first one with flow results
@@ -42,16 +43,22 @@ class OpticalFlow():
         self.name = satVidName
         self.step = step
         self.scale = scale
-        self.interval= interval
+        self.mean_limit = mean_limit
 
         # Get satellite image paths to mimic them
         data = ImgDataset(ImgType.SAT)
+        
+        satvideopath = os.path.join(self.videopath, 'sat')
+        with open(os.path.join(satvideopath, self.name+'-timestamps.pickle'), 'rb') as timestamp_list:
+            timestamps = pickle.load(timestamp_list)
 
+        self.timestamps = timestamps #data.timestamps[self.start_idx+step:self.stop_idx+step]
+        self.interval = TimeInterval(start=timestamps[0], stop=timestamps[-1])
+        
         #self.getDateIdx = data.getDateIdx
         self.start_idx = data.getDateIdx(self.interval.start)
         self.stop_idx = data.getDateIdx(self.interval.stop)
-        self.img_paths = data.img_paths[self.start_idx+step:self.stop_idx+step]
-        self.timestamps = data.timestamps[self.start_idx+step:self.stop_idx+step]
+        self.img_paths = data.img_paths[self.start_idx:self.stop_idx+1]
         
         # initialise dataframes for storing results of dense optical flow
         self.direction_pixel_df = pd.DataFrame(
@@ -72,7 +79,7 @@ class OpticalFlow():
 
         logging.info(f'Satellite video: {self.name}')
 
-    def denseflow(self, imgType: str, params: dict=None, play: bool=False, fps: int=6):
+    def denseflow(self, imgType: str, params: dict=None, save: bool=False, play: bool=False, fps: int=6):
         imgType = ImgType(imgType)
         timestr = '-'.join(self.name.split('-')[:4])
         flow_vid_name = f'{timestr}-{str(int(15*self.step))}min-{self.scale}sc-{imgType.value}'
@@ -119,6 +126,7 @@ class OpticalFlow():
         
         # Parameters for RLOF optical flow
         if params is None and imgType==ImgType.RLOF_DENSE:
+            '''optimal params, cause segmentation fault
             params = {
                 'forwardBackwardThreshold' : 2.5,
                 'epicK': 128, 
@@ -128,7 +136,19 @@ class OpticalFlow():
                 'fgsSigma' : 1.5,
                 'use_variational_refinement' : False,
                 'use_post_proc' : True
-            }
+            }'''
+            '''default params, cause segmentation fault
+            params = {
+                'forwardBackwardThreshold' : 1.0,
+                'epicK': 128, 
+                'epicSigma': 0.05,
+                'epicLambda' : 999.0,
+                'fgsLambda' : 500.0,
+                'fgsSigma' : 1.5,
+                'use_variational_refinement' : False,
+                'use_post_proc' : True
+            }'''
+            params = None
         
         if imgType==ImgType.FB_DENSE: self.__farneback(params=params)
         elif imgType==ImgType.DTVL1_DENSE: self.__dualTVL1(params=params)
@@ -138,13 +158,16 @@ class OpticalFlow():
             logging.warning(f'{imgType.value} does not correspond to any dense flow algorithms.')
             exit()
 
-        flowVid = FlowVid(imgType, flow_vid_name, self.interval, self.step)
-        flowVid.save()
         if play:
-            flowVid.play(flow_vid_name, fps=fps)
+            flowVid = FlowVid(imgType, flow_vid_name, self.interval, self.step)
+            flowVid.save()
+            flowVid.play(flow_vid_name, imgType.value, fps=fps)
+            flowVid.delete(flow_vid_name, imgType.value)
+        if save:
+            flowVid = FlowVid(imgType, flow_vid_name, self.interval, self.step)
+            flowVid.save()
 
-
-    def sparseflow(self, feature_params=None, skl_params=None, play=False, fps: int=6):
+    def sparseflow(self, feature_params=None, skl_params=None, save: bool=False, play=False, fps: int=6):
         # Parameters for ShiTomasi corner detection
         if feature_params is None:
             feature_params = dict( maxCorners = 100,
@@ -164,10 +187,14 @@ class OpticalFlow():
             timestr = '-'.join(self.name.split('-')[:4])
             flow_vid_name = f'{timestr}-{str(int(15*self.step))}min-{self.scale}sc-{imgType.value}'
             
-            flowVid = FlowVid(imgType, flow_vid_name, self.interval, self.step)
-            flowVid.save()
             if play:
-                flowVid.play(flow_vid_name, fps=fps)
+                flowVid = FlowVid(imgType, flow_vid_name, self.interval, self.step)
+                flowVid.save()
+                flowVid.play(flow_vid_name, imgType.value, fps=fps)
+                flowVid.delete(flow_vid_name, imgType.value)
+            if save:
+                flowVid = FlowVid(imgType, flow_vid_name, self.interval, self.step)
+                flowVid.save()
     
     def __get_degrees(self, ang_img) -> dict:
         '''
@@ -245,12 +272,16 @@ class OpticalFlow():
         logging.info(f'Step: {self.step*15} minutes.')
         logging.info(f'{self.timestamps[0]} to {self.timestamps[-1]}.')
         
+        # get limited interval for where optical flow is useful
+        [of_start_limit, of_stop_limit] = date2interval(self.timestamps[0])
+        
         # initialise and create where the results should be stored
         self.flow_img_paths = self.__create_image_folder(imgType.value)
     
         # Read the video and first frame
         cap = cv2.VideoCapture(os.path.join(self.videopath, 'sat', self.name+'.avi'))
         ret, old_frame = cap.read()
+        timestamp_counter = 0
         
         # create HSV & make Value a constant
         hsv = np.zeros_like(old_frame)
@@ -262,24 +293,43 @@ class OpticalFlow():
         # store the previous flow to use when computing the current
         #old_flow = None
 
-        counter = 0
         while True:
             # Read the next frame
             ret, new_frame = cap.read()
+            timestamp_counter += 1
             
             if not ret:
                 break
-            #logging.info(f'Performing {imgType.value} optical flow at for time {self.timestamps[counter]}')
+            img_dates = (self.timestamps[timestamp_counter-1], self.timestamps[timestamp_counter])
+            if img_dates[1].minute != 0: continue
+            if img_dates[1] <= of_start_limit+timedelta(hours=1) or \
+                img_dates[1] >= of_stop_limit - timedelta(hours=1):
+                logging.info(f'Skipping nighttime image at {img_dates}.')
+                continue
+            if ((img_dates[1]-img_dates[0]).seconds//60) > 30:
+                logging.info(f'Skipping due to lack of intermediate images.')
+                continue
+            if np.mean(new_frame) < self.mean_limit:
+                logging.info(f'Skipping due to low image mean: {np.mean(new_frame)}, mean limit: {self.mean_limit}')
+                continue
             
+            logging.info(f'{imgType.value} optflow for {img_dates}.')
             # Preprocessing for exact method
             if gray: new_frame = cv2.cvtColor(new_frame, cv2.COLOR_BGR2GRAY)
             
-            # Calculate Optical Flow
-            if imgType==ImgType.DTVL1_DENSE:
-                # does not take params as argument because they were already defined when creating the method
-                flow = method(old_frame, new_frame, None)
-            else:
-                flow = method(old_frame, new_frame, None, **params)
+            try:
+                # Calculate Optical Flow
+                if imgType==ImgType.DTVL1_DENSE:
+                    # does not take params as argument because they were already defined when creating the method
+                    flow = method(old_frame, new_frame, None)
+                elif imgType==ImgType.RLOF_DENSE:
+                    # avoid segmentation fault
+                    flow = method(old_frame, new_frame, None)
+                else:
+                    flow = method(old_frame, new_frame, None, **params)
+            except:
+                logging.info(f'Flow failed at {img_dates}. Continuing to next image.')
+                continue
             #old_flow = np.copy(flow)
             # Encoding: convert the algorithm's output into Polar coordinates
             mag, ang = cv2.cartToPolar(flow[..., 0], flow[..., 1])
@@ -297,21 +347,21 @@ class OpticalFlow():
             # registering wind direction estimate at park positions
             degrees_pixel, degrees_median = self.__get_degrees(ang)
             for key, value in degrees_pixel.items():
-                self.direction_pixel_df.loc[f'{self.timestamps[counter]}'][key] = value
+                self.direction_pixel_df.loc[f'{self.timestamps[timestamp_counter]}'][key] = value
             for key, value in degrees_median.items():
-                self.direction_median_df.loc[f'{self.timestamps[counter]}'][key] = value
+                self.direction_median_df.loc[f'{self.timestamps[timestamp_counter]}'][key] = value
 
             # registering wind speed estimate at park positions
             magnitudes_pixel, magnitudes_median = self.__get_magnitude(mag)
             for key, value in magnitudes_pixel.items():
-                self.magnitude_pixel_df.loc[f'{self.timestamps[counter]}'][key] = value
+                self.magnitude_pixel_df.loc[f'{self.timestamps[timestamp_counter]}'][key] = value
             for key, value in magnitudes_median.items():
-                self.magnitude_median_df.loc[f'{self.timestamps[counter]}'][key] = value
+                self.magnitude_median_df.loc[f'{self.timestamps[timestamp_counter]}'][key] = value
                 
             # save result image to data folder
-            cv2.imwrite(self.flow_img_paths[counter],bgr)
+            cv2.imwrite(self.flow_img_paths[timestamp_counter],bgr)
             
-            counter += 1
+            
 
         # done using video
         cap.release()

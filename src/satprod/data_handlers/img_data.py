@@ -126,11 +126,13 @@ class ImgDataset(torch.utils.data.Dataset):
     information on the time they were taken.
     '''
     
-    def __init__(self, imgType: ImgType):
+    def __init__(self, imgType: ImgType, normalize: bool=False):
         cd = str(os.path.dirname(os.path.abspath(__file__)))
         self.root = f'{cd}/../../..'
 
         self.imgType = imgType
+        
+        self.normalize = normalize
 
         # define where to get the images depending on the image type
         folder=f'img/{imgType.value}'
@@ -152,14 +154,24 @@ class ImgDataset(torch.utils.data.Dataset):
     def __getitem__(self, idx: int):
         # read image from path, and get its corresponding timestamp
         img = cv2.imread(self.img_paths[idx],1)
+        if self.normalize: img = img/255.0
         date = self.timestamps[idx]
 
         # return the correct imagetype
-        if self.imgType!=ImgType.SAT: return FlowImg(img, date, self.imgType)
-        else: return SatImg(img, date)
+        if self.imgType!=ImgType.SAT: 
+            return FlowImg(img, date, self.imgType)
+        else: 
+            return SatImg(img, date)
 
     def __len__(self):
         return len(self.img_paths)
     
     def getDateIdx(self, date: datetime) -> int:
-        return self.timestamps.index(date)
+        try:
+            return self.timestamps.index(date)
+        except ValueError:
+            return np.nan
+
+if __name__=='__main__':
+    data = ImgDataset(ImgType('sat'))
+    print(data[0].date)
