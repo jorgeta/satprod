@@ -85,7 +85,7 @@ class Vid():
         while(True):
             # Capture frame-by-frame
             _, frame = cap.read()
-
+            
             # Our operations on the frame come here
             if frame is not None:
                 # Display the resulting frame

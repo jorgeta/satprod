@@ -13,6 +13,7 @@ from satprod.optical_flow.optical_flow import OpticalFlow
 from satprod.data_handlers.num_data import NumericalDataHandler
 from satprod.configs.config_utils import structurize_wind_grid_images
 from satprod.pipelines.training import train_model
+from satprod.pipelines.evaluation import Evaluate
 
 from tasklog.tasklogger import init_logger
 init_logger()
@@ -36,26 +37,41 @@ class App:
         
     def train(self):
         train_model()
+        
+    def evaluate(self):
+        model_name = 'simple_LSTM'
+        timestamp = '2021-04-23-01-51'
+        park = 'bess'
+        evaluate = Evaluate(timestamp=timestamp, model_name=model_name, park=park)
+        evaluate.compare_to_baselines()
     
-    def satellite_video(self, play=False):
-        '''
-        Create and save satvid with name giving information about the test.
-        '''
-        date = datetime(2018,6,15)
+    def satellite_video(self, date: datetime=datetime(2019,6,3), play=False):
+        """Create and save satvid with name giving information about the test.
+
+        Args:
+            date (datetime, optional): [description]. Defaults to datetime(2019,6,3).
+            play (bool, optional): [description]. Defaults to False.
+        """
+        
         self.start = date + timedelta(hours=3)#datetime(2019,6,day,3)
         self.stop = date + timedelta(hours=21)#datetime(2019,6,day,21)
         self.interval = TimeInterval(self.start, self.stop)
         self.timestr = self.start.strftime('%Y-%m-%d-%H')
         
         self.sat_vid_name = f'{self.timestr}-{str(int(15*self.step))}min-{self.scale}sc-sat'
-            
+        
         satVid = SatVid(name=self.sat_vid_name, interval=self.interval, step=self.step, scale=self.scale)
         satVid.save()
         if play:
             satVid.play(self.sat_vid_name, 'sat', fps=self.fps)
             
-    def grid_video(self, play=True):
-        date = datetime(2017, 5, 17)
+    def grid_video(self, date: datetime=datetime(2019, 5, 17), play=True):
+        """Creates a video from the grid speed images.
+
+        Args:
+            date (datetime, optional): [description]. Defaults to datetime(2019, 5, 17).
+            play (bool, optional): [description]. Defaults to True.
+        """
         self.start = date
         self.stop = date + timedelta(hours=23)
         self.interval = TimeInterval(self.start, self.stop)
@@ -68,45 +84,58 @@ class App:
         if play:
             vid.play(self.grid_vid_name, 'grid', fps=2)
     
-    def run_optical_flow(self, imgType: str):
-        date = datetime(2018,6,15)
-        self.start = date + timedelta(hours=3)#datetime(2019,6,day,3)
-        self.stop = date + timedelta(hours=21)#datetime(2019,6,day,21)
+    def optflow(self, imgType: str, date: datetime=datetime(2019,6,3)):
+        """[summary]
+
+        Args:
+            imgType (str): [description]
+            date (datetime, optional): [description]. Defaults to datetime(2019,6,3).
+        """
+        self.start = date
+        self.stop = date + timedelta(hours=23)
         self.interval = TimeInterval(self.start, self.stop)
         self.timestr = self.start.strftime('%Y-%m-%d-%H')
         self.sat_vid_name = f'{self.timestr}-{str(int(15*self.step))}min-{self.scale}sc-sat'
         
         self.of = OpticalFlow(satVidName=self.sat_vid_name, step=self.step, scale=self.scale)
         
-        self.of.denseflow(imgType, play=True, save=True, fps=1)
-        
-    def optical_flow_all_days(self):
-        for imgType in ['lk_dense']:
-            for date in pd.date_range(start=datetime(2018,9,30), end=datetime(2018,12,31), freq='D'):
+        self.of.denseflow(imgType, play=False, save=False, fps=1)
+    
+    def optflow_all_days(self, imgType: str, 
+                        start: datetime=datetime(2018,3,20), 
+                        end: datetime=datetime(2019,3,19)):
+        """[summary]
+
+        Args:
+            imgType (str): [description]
+            start (datetime, optional): [description]. Defaults to datetime(2018,3,20).
+            end (datetime, optional): [description]. Defaults to datetime(2019,3,19).
+        """
+        for date in pd.date_range(start=datetime(2019,1,1), end=datetime(2019,3,19), freq='D'):
+            
+            self.interval = TimeInterval(date, date+timedelta(hours=23, minutes=59))
+            self.timestr = self.interval.start.strftime('%Y-%m-%d-%H')
+            
+            self.sat_vid_name = f'{self.timestr}-{str(int(15*self.step))}min-{self.scale}sc-sat'
+            try:
+                satVid = SatVid(name=self.sat_vid_name, interval=self.interval, step=self.step, scale=self.scale)
+                satVid.save()
+                #satVid.play(self.sat_vid_name, 'sat')
+            except:
+                continue
                 
-                self.interval = TimeInterval(date, date+timedelta(hours=23, minutes=59))
-                self.timestr = self.interval.start.strftime('%Y-%m-%d-%H')
+            try:
+                self.of = OpticalFlow(
+                    satVidName=self.sat_vid_name, step=self.step, scale=self.scale)
                 
-                self.sat_vid_name = f'{self.timestr}-{str(int(15*self.step))}min-{self.scale}sc-sat'
-                try:
-                    satVid = SatVid(name=self.sat_vid_name, interval=self.interval, step=self.step, scale=self.scale)
-                    satVid.save()
-                    #satVid.play(self.sat_vid_name, 'sat')
-                except:
-                    continue
-                    
-                try:
-                    self.of = OpticalFlow(
-                        satVidName=self.sat_vid_name, step=self.step, scale=self.scale)
-                    
-                    self.of.denseflow(imgType, save=False, play=False, fps=1)
-                except:
-                    pass
-                
-                try:
-                    satVid.delete(self.sat_vid_name, 'sat')
-                except:
-                    continue
+                self.of.denseflow(imgType, save=False, play=False, fps=1)
+            except:
+                pass
+            
+            try:
+                satVid.delete(self.sat_vid_name, 'sat')
+            except:
+                continue
     
     def wind_grid_structurize(self):
         structurize_wind_grid_images()
