@@ -10,28 +10,34 @@ from torch.autograd import Variable
 from torch.optim.lr_scheduler import StepLR
 from sklearn.metrics import mean_absolute_error
 from matplotlib import pyplot as plt
-import pickle
+#import pickle
 
 from satprod.pipelines.dataset import WindDataset
-from satprod.ml.models import LSTM_net
+
+from satprod.ml.lstm import LSTM_net
+from satprod.ml.agru import AGRU
+from satprod.ml.tcn import TCN
+
 from satprod.data_handlers.data_utils import get_columns
 from satprod.configs.job_configs import TrainConfig
-from satprod.pipelines.evaluation import Results, store_results, Evaluate
+from satprod.pipelines.evaluation import Results, Evaluate, store_results
 
 from tasklog.tasklogger import logging
+from tqdm import tqdm
 
 def test_forward_pass():
     raise NotImplementedError
 
 def train_model():
-
-    parks = ['bess']#,'vals','skom','yvik']
-    num_feature_types = ['forecast', 'direction', 'speed', 'production']#, 'velocity_cubed']
-    img_features = []
+    
+    parks = ['skom']#,'vals','skom','yvik']
+    num_feature_types = ['production', 'speed', 'forecast'] #['forecast', 'direction', 'speed', 'production']
+    img_features = ['grid']
+    img_extraction_method = 'resnet' # lenet, deepsense
     
     train_config = TrainConfig(
         batch_size = 64,
-        num_epochs = 15,
+        num_epochs = 30,
         learning_rate = 4e-3,
         scheduler_step_size = 5,
         scheduler_gamma = 0.8,
@@ -40,7 +46,8 @@ def train_model():
         random_seed = 0,
         parks = parks,
         num_feature_types = num_feature_types,
-        img_features = img_features
+        img_features = img_features,
+        img_extraction_method = img_extraction_method
     )
     
     # get data
@@ -51,6 +58,17 @@ def train_model():
     hidden_size = 16
     linear_size = 64
     num_layers = 1
+    channels_1 = 16
+    channels_2 = 32
+    kernel_size_conv = [8,4]
+    stride_conv = [4,4]
+    padding_conv = [0,0]
+    kernel_size_pool = [3,2]
+    stride_pool = [3,1]
+    padding_pool = [0,0]
+    
+    
+    if len(train_config.img_features)==0: channels_2 = 0
     num_input_features = wind_dataset.n_past_features
     num_forecast_features = wind_dataset.n_forecast_features
     num_output_features = wind_dataset.n_output_features
@@ -64,10 +82,22 @@ def train_model():
         num_output_features=num_output_features, 
         num_layers=num_layers, 
         sequence_len=sequence_length,
-        initialization='xavier', 
-        activation=nn.Tanh() #nn.ReLU()
+        channels_1=channels_1,
+        channels_2=channels_2,
+        kernel_size_conv=kernel_size_conv,
+        stride_conv=stride_conv,
+        padding_conv=padding_conv,
+        kernel_size_pool=kernel_size_pool,
+        stride_pool=stride_pool,
+        padding_pool=padding_pool,
+        height=wind_dataset.img_height,
+        width=wind_dataset.img_width,
+        initialization='xavier',
+        activation=nn.Tanh(), #nn.ReLU()
+        img_extraction_method=train_config.img_extraction_method
     )
     
+    # train the model and return the model with the lowest validation error
     best_model, results = train_loop(net, train_config, wind_dataset)
     
     now = datetime.now().strftime('%Y-%m-%d-%H-%M')
@@ -101,6 +131,7 @@ def train_loop(net, train_config, data: WindDataset):
     for name, param in net.named_parameters():
         if param.requires_grad:
             params_in_network += len(np.ravel(param.data.numpy()))
+            print(param.data.numpy().shape)
     logging.info(f'Parameters in network: {params_in_network}.')
     
     criterion = nn.L1Loss()
@@ -139,21 +170,38 @@ def train_loop(net, train_config, data: WindDataset):
         step_size=train_config.scheduler_step_size, 
         gamma=train_config.scheduler_gamma
     )
-    '''num_batches_train = 2
+    '''
+    num_batches_train = 2
     train_indices = train_indices[:(num_batches_train+1)*batch_size]
     num_batches_valid = 2
-    valid_indices = valid_indices[:(num_batches_valid+1)*batch_size]'''
+    valid_indices = valid_indices[:(num_batches_valid+1)*batch_size]
+    '''
     
-    def get_sequenced_data(batch_indices: [int]):
+    def get_sequenced_data(batch_indices):
         input_data_array = []
         target_data_array = []
         forecast_data_array = []
+        img_data_array = []
+        
         for j in batch_indices:
             input_data = data[j-sequence_length:j].copy()
             target_data = data[j:j+pred_sequence_length][data.target_labels].copy()
             
             if len(input_data.dropna(axis=0)) < sequence_length: continue
             if len(target_data.dropna(axis=0)) < pred_sequence_length: continue
+            
+            if data.n_image_features > 0:
+                img_data = input_data[train_config.img_features].copy()
+                input_data = input_data.drop(columns=train_config.img_features)
+            
+                img_data = img_data.astype(int)
+                image_sequence = []
+                img_indices = np.ravel(img_data[train_config.img_features].values)
+                for index in img_indices:
+                    image_sequence.append(data.img_datasets[train_config.img_features[0]][index].img)
+                    
+                img_data = torch.from_numpy(np.array(image_sequence))
+                img_data_array.append(img_data)
             
             forecast_data = get_columns(input_data, '+').iloc[-1]
             if len(forecast_data)>0:
@@ -166,20 +214,25 @@ def train_loop(net, train_config, data: WindDataset):
             
             input_data_array.append(input_data)
             target_data_array.append(target_data)
-            
+        
         if len(input_data_array)==0:
-            return None, None, None
+            return None, None, None, None
         if len(target_data_array)==0:
-            return None, None, None
+            return None, None, None, None
         
         X_batch = torch.stack(input_data_array)
         y_batch = torch.stack(target_data_array)
         
+        if data.n_image_features > 0:
+            X_batch_img = torch.stack(img_data_array)
+        else:
+            X_batch_img = None
         if len(forecast_data_array)>0:
             X_batch_forecasts = torch.stack(forecast_data_array)
-            return X_batch, X_batch_forecasts, y_batch
         else:
-            return X_batch, None, y_batch
+            X_batch_forecasts = None
+
+        return X_batch, X_batch_forecasts, X_batch_img, y_batch
     
     for epoch in range(num_epochs):
         # shuffle
@@ -187,34 +240,37 @@ def train_loop(net, train_config, data: WindDataset):
         
         ## Train
         net.train()
-        for i in range(num_batches_train+1):
+        for i in tqdm(range(num_batches_train+1), desc="Training"):
             train_batch_indices = train_indices[i*batch_size:(i+1)*batch_size]
             
             optimizer.zero_grad()
             
-            X_batch, X_batch_forecasts, y_batch = get_sequenced_data(train_batch_indices)
+            X_batch, X_batch_forecasts, X_batch_img, y_batch = get_sequenced_data(train_batch_indices)
             if X_batch is None: continue
             current_batch_size = X_batch.shape[0]
             X_batch = Variable(X_batch).float().to(device)
             y_batch = Variable(y_batch).float().to(device)
             if X_batch_forecasts is not None:
                 X_batch_forecasts = Variable(X_batch_forecasts).float().to(device)
+            if X_batch_img is not None:
+                X_batch_img = Variable(X_batch_img).float().to(device)
             
-            output = net(X_batch, X_batch_forecasts)
+            output = net(X_batch, X_batch_forecasts, X_batch_img)
+            
             
             # compute gradients given loss
             batch_loss = criterion(output, y_batch)
             
             batch_loss.backward()
             optimizer.step()
-            
+        
         net.eval()
         ## Evaluate training
         train_preds, train_targs = [], []
-        for i in range(num_batches_train+1):
+        for i in tqdm(range(num_batches_train+1), desc="Train evaluation"):
             train_batch_indices = np.sort(train_indices)[i*batch_size:(i+1)*batch_size]
             
-            X_batch, X_batch_forecasts, y_batch = get_sequenced_data(train_batch_indices)
+            X_batch, X_batch_forecasts, X_batch_img, y_batch = get_sequenced_data(train_batch_indices)
             if X_batch is None: continue
             current_batch_size = X_batch.shape[0]
             
@@ -222,18 +278,20 @@ def train_loop(net, train_config, data: WindDataset):
             y_batch = Variable(y_batch).float().to(device)
             if X_batch_forecasts is not None:
                 X_batch_forecasts = Variable(X_batch_forecasts).float().to(device)
+            if X_batch_img is not None:
+                X_batch_img = Variable(X_batch_img).float().to(device)
             
-            output = net(X_batch, X_batch_forecasts)
+            output = net(X_batch, X_batch_forecasts, X_batch_img)
             
             train_targs += list(y_batch.data.numpy())
             train_preds += list(output.data.numpy())
         
         ## Evaluate validation
         val_preds, val_targs = [], []
-        for i in range(num_batches_valid+1):
+        for i in tqdm(range(num_batches_valid+1), desc="Valid evaluation"):
             valid_batch_indices = valid_indices[i*batch_size:(i+1)*batch_size]
             
-            X_batch, X_batch_forecasts, y_batch = get_sequenced_data(valid_batch_indices)
+            X_batch, X_batch_forecasts, X_batch_img, y_batch = get_sequenced_data(valid_batch_indices)
             if X_batch is None: continue
             current_batch_size = X_batch.shape[0]
             
@@ -241,8 +299,10 @@ def train_loop(net, train_config, data: WindDataset):
             y_batch = Variable(y_batch).float().to(device)
             if X_batch_forecasts is not None:
                 X_batch_forecasts = Variable(X_batch_forecasts).float().to(device)
+            if X_batch_img is not None:
+                X_batch_img = Variable(X_batch_img).float().to(device)
             
-            output = net(X_batch, X_batch_forecasts)
+            output = net(X_batch, X_batch_forecasts, X_batch_img)
             
             val_targs += list(y_batch.data.numpy())
             val_preds += list(output.data.numpy())

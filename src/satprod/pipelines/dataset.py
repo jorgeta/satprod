@@ -21,6 +21,10 @@ class WindDataset(torch.utils.data.Dataset):
         self.root = f'{cd}/../../..'
         self.formatted_data_path = os.path.join(self.root, 'data', 'formatted')
         
+        try:
+            self.img_extraction_method = train_config.img_extraction_method
+        except:
+            self.img_extraction_method = 'lenet'
         self.parks=train_config.parks
         self.num_feature_types=train_config.num_feature_types
         self.img_features=train_config.img_features
@@ -34,9 +38,14 @@ class WindDataset(torch.utils.data.Dataset):
         # select wanted features
         park_data = []
         for park in self.parks:
-            park_data.append(get_columns(num_data, park))
+            if park=='skom' and 'bess' not in self.parks:
+                park_data.append(get_columns(num_data, 'bess'))
+                park_data[-1] = park_data[-1].drop(columns='production_bess')
+                park_data.append(get_columns(num_data, park))
+            else:
+                park_data.append(get_columns(num_data, park))
         num_data = pd.concat(park_data, axis=1)
-        for feature_type in ['speed', 'direction', 'velocity_cubed']:
+        for feature_type in ['speed', 'direction']:
             if feature_type not in self.num_feature_types:
                 num_data = num_data.drop(columns=get_columns(num_data, feature_type).columns.values)
         if 'forecast' not in self.num_feature_types:
@@ -67,12 +76,23 @@ class WindDataset(torch.utils.data.Dataset):
             # create img data dataset, write to file, and return set
             img_data = self.update_image_indices(num_data)
         
+        # image datasets
         self.img_datasets = {}
         for col in img_data.columns:
             if col not in self.img_features:
                 img_data = img_data.drop(columns=[col])
             else:
-                self.img_datasets[col] = ImgDataset(ImgType(col), normalize=True)
+                if self.img_extraction_method=='resnet':
+                    self.img_datasets[col] = ImgDataset(ImgType(col), normalize=True, upscale=True) #[62, 12, 224, 224, 3]
+                else:
+                    self.img_datasets[col] = ImgDataset(ImgType(col), normalize=True, grayscale=True)
+        
+        if len(self.img_features)>0:
+            self.img_height = self.img_datasets[self.img_features[0]][0].height
+            self.img_width = self.img_datasets[self.img_features[0]][0].width
+        else:
+            self.img_height = 0
+            self.img_width = 0
         
         # save unscaled data
         self.data_unscaled = pd.concat([num_data, img_data], axis=1)
@@ -80,9 +100,12 @@ class WindDataset(torch.utils.data.Dataset):
         # must be called in init
         self.__split_and_scale_data(num_data, img_data)
         
+        # some useful measurements
+        self.n_image_features = len(img_data.columns)
         self.n_forecast_features = len(get_columns(self.data, '+').columns)
-        self.n_past_features = len(self.data.columns)-self.n_forecast_features
+        self.n_past_features = len(self.data.columns)-self.n_forecast_features-self.n_image_features
         self.n_output_features = len(self.target_labels)
+        
         
     def update_image_indices(self, num_data):
         
@@ -141,12 +164,10 @@ class WindDataset(torch.utils.data.Dataset):
         train_without_direction = pd.concat([
             get_columns(num_data_train_scaled, 'speed'), 
             get_columns(num_data_train_scaled, 'production'), 
-            get_columns(num_data_train_scaled, 'velocity_cubed')
             ], axis=1)
         valid_without_direction = pd.concat([
             get_columns(num_data_valid_scaled, 'speed'), 
             get_columns(num_data_valid_scaled, 'production'),
-            get_columns(num_data_valid_scaled, 'velocity_cubed')
             ], axis=1)
         #test_without_direction = pd.concat([get_columns(test, 'speed'), get_columns(test, 'production')], axis=1)
         
@@ -168,6 +189,8 @@ class WindDataset(torch.utils.data.Dataset):
         #num_data_scaled = pd.concat([num_data_train_scaled, num_data_valid_scaled, test], axis=0)
         
         self.data = pd.concat([num_data_scaled, img_data], axis=1)
+        self.data = self.data.dropna(axis=0)
+        self.data = self.data.asfreq('H')
         
     def __getitem__(self, idx: int):
         return self.data.iloc[idx]
@@ -176,12 +199,26 @@ class WindDataset(torch.utils.data.Dataset):
         return len(self.data)
         
 if __name__ =='__main__':
-    parks = ['bess', 'vals']
-    num_feature_types = ['direction', 'velocity_cubed']
-    img_features = []
-    wind_dataset = WindDataset(parks, num_feature_types, img_features)
+    parks = ['bess']#,'vals','skom','yvik']
+    num_feature_types = ['production']
+    img_features = ['grid']
     
-    print(wind_dataset.data)
+    train_config = TrainConfig(
+        batch_size = 64,
+        num_epochs = 15,
+        learning_rate = 4e-3,
+        scheduler_step_size = 5,
+        scheduler_gamma = 0.8,
+        train_valid_splits = 1,
+        pred_sequence_length = 5,
+        random_seed = 0,
+        parks = parks,
+        num_feature_types = num_feature_types,
+        img_features = img_features
+    )
+    wind_dataset = WindDataset(train_config)
+    
+    print(wind_dataset.data.dropna(axis=0))
     '''i = 0
     for img_feature in wind_dataset.img_features:
         idx = int(wind_dataset[i][img_feature])

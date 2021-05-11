@@ -10,7 +10,7 @@ import pickle
 
 from satprod.configs.config_utils import TimeInterval
 from satprod.configs.job_configs import TrainConfig
-from satprod.ml.models import LSTM_net
+from satprod.ml.lstm import LSTM_net
 from satprod.pipelines.dataset import WindDataset
 from satprod.data_handlers.data_utils import get_columns
 
@@ -57,6 +57,13 @@ class Evaluate():
         self.timestamp = timestamp
         self.model_name = model_name
         self.park = park
+        
+        self.park_name = {
+            'bess': 'Bessakerfjellet', 
+            'skom': 'Skomakerfjellet', 
+            'vals': 'Valsneset', 
+            'yvik': 'Ytre Vikna'
+        }
         
         self.get_stored_results()
         self.info()
@@ -123,10 +130,10 @@ class Evaluate():
         
         #(384, 5, 4)
         
-        print(f'Shape of validation predictions: {self.val_preds_unscaled.shape}')
+        logging.info(f'Shape of validation predictions: {self.val_preds_unscaled.shape}')
         
     def create_error_matrix(self):
-        total_mae = mean_absolute_error(np.ravel(self.val_targs_unscaled), np.ravel(self.val_preds_unscaled))
+        self.total_mae = mean_absolute_error(np.ravel(self.val_targs_unscaled), np.ravel(self.val_preds_unscaled))
         
         error_matrix = np.zeros((self.val_targs_unscaled.shape[1], self.val_targs_unscaled.shape[2]))
         for i in range(error_matrix.shape[0]):
@@ -153,70 +160,87 @@ class Evaluate():
             axis[i].set_xticks(range(self.error_matrix.shape[0]))
             axis[i].set_xticklabels([f'{h+1}' for h in range(self.error_matrix.shape[0])])
         plt.savefig(f'{self.path}/validation_maes.png')
+        plt.close()
         #plt.show()
-        
     
-    def compare_to_baselines(self):
-        # persistence
+    def persistence(self):
+        
+        # get relevant production
         prod = get_columns(self.wind_dataset.data_unscaled, 'production')
         prod = prod[prod.index >= self.wind_dataset.valid_start]
         prod = prod[prod.index < self.wind_dataset.test_start]
         prod_columns = prod.columns
         
         self.persistence_error_matrix = np.zeros_like(self.error_matrix) #(5,4)
-        for i in range(self.persistence_error_matrix.shape[0]):
+        
+        for i in range(self.train_config.pred_sequence_length):
             for j, col in enumerate(prod_columns):
                 preds = prod[col].shift(1).loc[self.val_prediction_interval.start:self.val_prediction_interval.stop]
                 targs = prod[col].shift(-i).loc[self.val_prediction_interval.start:self.val_prediction_interval.stop]
                 self.persistence_error_matrix[i,j] = mean_absolute_error(preds, targs)
         
-        # linear
+        self.persistence_total_mae = np.mean(np.ravel(self.persistence_error_matrix))
+    
+    def avg_of_history_model(self):
+        upper_percent_standard = 1.1
+        lower_percent_standard = 0.9
+        
+        upper_percent = upper_percent_standard
+        lower_percent = lower_percent_standard
+        
+        # get wind_speeds and wind speed forecasts
         speed = get_columns(self.wind_dataset.data_unscaled, 'speed')
         wind_speed_forecasts = get_columns(get_columns(self.wind_dataset.data_unscaled,'speed'), '+')
-        
         val_wind_forecasts = wind_speed_forecasts.loc[self.val_prediction_interval.start:self.val_prediction_interval.stop].values
-        
-        prod = get_columns(self.wind_dataset.data_unscaled, 'production')
+        while val_wind_forecasts.ndim < 3:
+            val_wind_forecasts = val_wind_forecasts[..., np.newaxis]
         speed = speed.drop(columns=wind_speed_forecasts.columns)
+        prod = get_columns(self.wind_dataset.data_unscaled, 'production')
         
-        def linear_prediction(x, speed, prod):
-            if x==0:
-                return 0
-            # linear model
-            # Create linear regression object
-            from sklearn import linear_model
-            regr = linear_model.LinearRegression()
-            
-            regression_data = pd.concat([speed, prod], axis=1)
-            regression_data = regression_data.dropna(axis=0)
-            regression_data = regression_data[regression_data.index < self.wind_dataset.valid_start]
-            
-            regression_data = regression_data[regression_data['wind_speed_bess'] > 0.9*x].copy()
-            regression_data = regression_data[regression_data['wind_speed_bess'] < 1.1*x]
-            
-            regr.fit(regression_data['wind_speed_bess'].values.reshape(-1, 1), regression_data['production_bess'].values.reshape(-1, 1))
-            
-            return regr.predict(np.array(x).reshape(-1, 1))[0][0]
+        speed_prod = pd.concat([speed, prod], axis=1).dropna(axis=0)
+        speed_prod = speed_prod[speed_prod.index < self.wind_dataset.valid_start]
         
-        linear_val_preds = np.zeros_like(val_wind_forecasts)
-        for i in range(linear_val_preds.shape[0]):
-            for j in range(linear_val_preds.shape[1]):
-                linear_val_preds[i, j] = linear_prediction(val_wind_forecasts[i][j], speed, prod)
+        preds = np.zeros_like(val_wind_forecasts)
         
-        linear_val_preds = linear_val_preds.reshape(self.val_targs_unscaled.shape)
+        for i in range(preds.shape[0]):
+            for j in range(preds.shape[1]):
+                for k in range(preds.shape[2]):
+                    wind_forecast = val_wind_forecasts[i][j][k]
+                    park = self.train_config.parks[k]
+                    
+                    similar_situation_production_avg = []
+                    while len(similar_situation_production_avg)==0:
+                        if park=='skom':
+                            similar_situation_production_avg = speed_prod[
+                                (speed_prod[f'wind_speed_bess'] > lower_percent*wind_forecast) & (speed_prod[f'wind_speed_bess'] < upper_percent*wind_forecast)
+                                ][f'production_skom'].values
+                        else:
+                            similar_situation_production_avg = speed_prod[
+                                (speed_prod[f'wind_speed_{park}'] > lower_percent*wind_forecast) & (speed_prod[f'wind_speed_{park}'] < upper_percent*wind_forecast)
+                                ][f'production_{park}'].values
+                        lower_percent -= 0.1
+                        upper_percent += 0.1
+                    
+                    lower_percent = lower_percent_standard
+                    upper_percent = upper_percent_standard
+                    preds[i, j, k] = np.mean(similar_situation_production_avg)
         
-        self.linear_model_error_matrix = np.zeros((self.val_targs_unscaled.shape[1], self.val_targs_unscaled.shape[2]))
-        for i in range(self.linear_model_error_matrix.shape[0]):
-            for j in range(self.linear_model_error_matrix.shape[1]):
-                self.linear_model_error_matrix[i][j] = mean_absolute_error(self.val_targs_unscaled[:,i,j], linear_val_preds[:,i,j])
+        self.avg_of_history_error_matrix = np.zeros((self.val_targs_unscaled.shape[1], self.val_targs_unscaled.shape[2]))
+        for i in range(self.avg_of_history_error_matrix.shape[0]):
+            for j in range(self.avg_of_history_error_matrix.shape[1]):
+                self.avg_of_history_error_matrix[i][j] = mean_absolute_error(self.val_targs_unscaled[:,i,j], preds[:,i,j])
+    
+    def baseline_comparisons(self):
+        self.persistence()
+        self.avg_of_history_model()
         
-        print(self.persistence_error_matrix)
-        print(self.linear_model_error_matrix)
-        print(self.error_matrix)
+        logging.info(f'Persistence MAEs:\n{self.persistence_error_matrix}')
+        logging.info(f'Average history based model MAEs:\n{self.avg_of_history_error_matrix}')
+        logging.info(f'{self.model_name} MAEs:\n{self.error_matrix}')
         
         labels = ['1', '2', '3', '4', '5']
         per = np.ravel(self.persistence_error_matrix)
-        lin = np.ravel(self.linear_model_error_matrix)
+        lin = np.ravel(self.avg_of_history_error_matrix)
         lstm = np.ravel(self.error_matrix)
 
         x = np.arange(len(labels))  # the label locations
@@ -234,41 +258,47 @@ class Evaluate():
         ax.set_xticks(x)
         ax.set_xticklabels(labels)
         ax.legend()
-
-        #ax.bar_label(rects1, padding=3)
-        #ax.bar_label(rects2, padding=3)
-
+        
         fig.tight_layout()
         plt.savefig(f'{self.path}/error_comparison.png')
-        plt.show()
-        
-        
-        '''
-        plt.plot(np.ravel(self.results.train_targs), label='train_targs')
-        plt.plot(np.ravel(train_preds), label='train_preds')
-        plt.legend()
-        plt.savefig(f'storage/train.png')
-        plt.show(block=False)
-        plt.pause(0.25)
         plt.close()
+    
+    def plot_fitting_example(self):
         
-        plt.plot(np.ravel(val_targs), label='val_targs')
-        plt.plot(np.ravel(val_preds), label='val_preds')
-        plt.legend()
-        plt.savefig(f'storage/val_{now}.png')
-        plt.show(block=False)
-        plt.pause(0.25)
-        plt.close()
-        
-        epochs = np.arange(len(train_mae))
         plt.figure()
-        plt.plot(epochs, train_mae, 'r', epochs, valid_mae, 'b')
+        plt.ylabel('production (kWh/h)')
+        plt.xlabel('hours')
+        index = 1
+        n_samples_shown = np.minimum(50, self.val_targs_unscaled.shape[0])
+        n_plots = self.train_config.pred_sequence_length*len(self.train_config.parks)
+        for i in range(self.train_config.pred_sequence_length):
+            for j in range(len(self.train_config.parks)):
+                plt.subplot(self.train_config.pred_sequence_length, len(self.train_config.parks), index) #(nrows, ncols, index)
+                plt.plot(np.ravel(np.array(self.val_targs_unscaled)[:n_samples_shown, i, j]), label='targets')
+                plt.plot(np.ravel(np.array(self.val_preds_unscaled)[:n_samples_shown, i, j]), label='predicitions')
+                
+                
+                plt.title(f'{i+1}h ahead at {self.park_name[self.train_config.parks[j]]}', fontsize=8)
+                if index==n_plots:
+                    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=8)
+                    plt.xticks(fontsize=8)
+                    plt.yticks(fontsize=8)
+                else:
+                    plt.xticks([])
+                plt.tight_layout()
+                index += 1
+        plt.tight_layout()
+        plt.savefig(f'{self.path}/fitting_examples.png')
+        plt.close()
+        
+    def plot_training_curve(self):
+        
+        epochs = np.arange(len(self.results.train_mae))
+        plt.plot(epochs, self.results.train_mae, 'r', epochs, self.results.valid_mae, 'b')
         plt.legend(['train MAE','validation MAE'])
         plt.xlabel('epochs')
         plt.ylabel('MAE')
-        plt.savefig(f'storage/maes_{now}.png')
-        plt.show(block=False)
-        plt.pause(0.25)
-        plt.close()
+        plt.axvline(x=self.results.epoch)
         
-        '''
+        plt.savefig(f'{self.path}/training_curve.png')
+        plt.close()

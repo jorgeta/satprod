@@ -40,10 +40,12 @@ class App:
         
     def evaluate(self):
         model_name = 'simple_LSTM'
-        timestamp = '2021-04-23-01-51'
-        park = 'bess'
+        timestamp = '2021-05-11-17-40'
+        park = 'skom'
         evaluate = Evaluate(timestamp=timestamp, model_name=model_name, park=park)
-        evaluate.compare_to_baselines()
+        evaluate.baseline_comparisons()
+        evaluate.plot_fitting_example()
+        evaluate.plot_training_curve()
     
     def satellite_video(self, date: datetime=datetime(2019,6,3), play=False):
         """Create and save satvid with name giving information about the test.

@@ -1,9 +1,7 @@
 import numpy as np
 import torch
 from torch import nn
-import os
-import pandas as pd
-from satprod.pipelines.dataset import WindDataset
+from satprod.ml.imgnets import LeNet, ResNet, DeepSense
 
 class LSTM_net(nn.Module):
     
@@ -15,10 +13,22 @@ class LSTM_net(nn.Module):
                 num_output_features: int, 
                 num_layers: int, 
                 sequence_len: int,
+                channels_1: int,
+                channels_2: int,
+                kernel_size_conv: [int],
+                stride_conv: [int],
+                padding_conv: [int],
+                kernel_size_pool: [int],
+                stride_pool: [int],
+                padding_pool: [int],
+                height: int = 100, 
+                width: int = 100,
                 linear_size: int=0,
                 dropout: float=0.0,
                 initialization: str=None, 
-                activation=None):
+                activation=None, 
+                in_channels: int=1, 
+                img_extraction_method: str=None):
         super(LSTM_net, self).__init__()
         
         self.name = 'simple_LSTM'
@@ -34,9 +44,9 @@ class LSTM_net(nn.Module):
         self.dropout = nn.Dropout(dropout)
         
         if self.num_layers > 1:
-            self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True, dropout=dropout)
+            self.lstm = nn.LSTM(input_size+channels_2, hidden_size, num_layers, batch_first=True, dropout=dropout)
         else:
-            self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
+            self.lstm = nn.LSTM(input_size+channels_2, hidden_size, num_layers, batch_first=True)
         
         if self.linear_size > 0:
             self.linear1 = nn.Linear(self.hidden_size+self.num_forecast_features, self.linear_size)
@@ -63,19 +73,60 @@ class LSTM_net(nn.Module):
         
         self.activation = activation
         
-    def forward(self, x, x_forecasts):
+        self.img_extraction_method = img_extraction_method
+        if self.img_extraction_method=='lenet':
+            self.lenet = LeNet(
+                channels_1,
+                channels_2,
+                kernel_size_conv,
+                stride_conv,
+                padding_conv,
+                kernel_size_pool,
+                stride_pool,
+                padding_pool,
+                height, 
+                width,
+                in_channels
+            )
+        else:
+            self.resnet = ResNet(output_size=channels_2)
+    
+    def forward(self, x, x_forecasts, x_img):
         
         # x shape: (batch_size, sequence_length, num_past_features)
         # x_forecasts shape: (batch_size, num_forecast_features)
+        # x_img shape: (batch_size, sequence_length, img_height, img_width)
+            # or (batch_size, sequence_length, img_height, img_width, bands)
         batch_size = x.shape[0]
+        if x_img is not None:
+            if self.img_extraction_method=='lenet':
+                x_img_features = []
+                for i in range(x_img.shape[1]):
+                    img = x_img[:, i, :, :]#.reshape(x_img.shape[0], 1, x_img.shape[2], x_img.shape[3])
+                    img = self.lenet(img)
+                    x_img_features.append(img)
+                
+                x_img = torch.stack(x_img_features).view(batch_size, self.sequence_len, -1)
+                # x_img shape: (batch_size, sequence_length, channels_2)
+                
+            else:
+                x_img_features = []
+                for i in range(x_img.shape[1]):
+                    img = x_img[:, i, :, :, :]#.reshape(x_img.shape[0], 1, x_img.shape[2], x_img.shape[3])
+                    img = self.resnet(img)
+                    x_img_features.append(img)
+                
+                x_img = torch.stack(x_img_features).view(batch_size, self.sequence_len, -1)
+        
+            x = torch.cat([x, x_img], dim=2)
         
         x, _ = self.lstm(x)
         # x.shape: (batch_size, seq_len, hidden_size)
 
         x = x[:, -1, :]
         # x.shape: (batch_size, hidden_size)
-        
-        x = torch.cat([x, x_forecasts], dim=1)
+        if x_forecasts is not None:
+            x = torch.cat([x, x_forecasts], dim=1)
         
         if self.linear_size > 0:
             x = self.activation(self.linear1(x))
@@ -91,35 +142,6 @@ class LSTM_net(nn.Module):
         # x.shape: (batch_size, output_size, num_output_features)
         
         return x
-
-class Persistence():
-
-    def __init__(self, pred_sequence_length: int):
-        self.name = 'persistence'
-        self.sequence_length = 1
-        self.pred_sequence_length = pred_sequence_length
-    
-    def predict(self, observation: pd.DataFrame):
-        current_production = get_columns(observation, 'production').values
-        prediction = np.zeros((self.pred_sequence_length, len(current_production)))
-        for i in range(self.pred_sequence_length):
-            prediction[i] = current_production
-        return prediction
-
-class WindSpeedCubed():
-    
-    def __init__(self, pred_sequence_length: int, dataset: WindDataset):
-        self.name = 'wind_speed_cubed'
-        self.sequence_length = 1
-        self.pred_sequence_length = pred_sequence_length
-        self.dataset = dataset
-    
-    def predict(self, observation: pd.DataFrame):
-        if 'velocity_cubed' in observation.columns:
-            wind_speed_forecasts_cubed = get_columns(get_columns(observation,'velocity_cubed'), '+').values
-        else:
-            wind_speed_forecasts_cubed = get_columns(get_columns(observation,'speed'), '+').pow(3).values
-        print(wind_speed_forecasts_cubed)
 
 if __name__ =='__main__':
     lstm = LSTM_net(1,1,1,1,1)

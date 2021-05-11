@@ -6,6 +6,7 @@ import os
 import torch
 import torchvision
 import torch.utils.data
+from torchvision import transforms
 
 import cv2
 
@@ -44,7 +45,7 @@ class Img():
         Transfroms image into tensor. (Returns new tensor object, 
         does not change img instance of class.
         '''
-        toTensor = torchvision.transforms.ToTensor()
+        toTensor = transforms.ToTensor()
         return toTensor(self.img)
 
 
@@ -126,13 +127,19 @@ class ImgDataset(torch.utils.data.Dataset):
     information on the time they were taken.
     '''
     
-    def __init__(self, imgType: ImgType, normalize: bool=False):
+    def __init__(self, imgType: ImgType, normalize: bool=False, upscale: bool=False, grayscale: bool=False):
         cd = str(os.path.dirname(os.path.abspath(__file__)))
         self.root = f'{cd}/../../..'
 
-        self.imgType = imgType
-        
+        self.upscale = upscale
         self.normalize = normalize
+        self.grayscale = grayscale
+        
+        self.imgType = imgType
+        if self.imgType==ImgType.GRID:
+            self.flag = 0
+        else:
+            self.flag = 1
 
         # define where to get the images depending on the image type
         folder=f'img/{imgType.value}'
@@ -153,15 +160,23 @@ class ImgDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, idx: int):
         # read image from path, and get its corresponding timestamp
-        img = cv2.imread(self.img_paths[idx],1)
-        if self.normalize: img = img/255.0
+        if self.grayscale:
+            img = cv2.imread(self.img_paths[idx], 0)
+        else:
+            img = cv2.imread(self.img_paths[idx], 1)
+        if self.normalize:
+            img = img/255.0
+        if self.upscale: 
+            img = cv2.resize(img, (224, 224), interpolation = cv2.INTER_AREA)
+        
         date = self.timestamps[idx]
+        
 
         # return the correct imagetype
-        if self.imgType!=ImgType.SAT: 
-            return FlowImg(img, date, self.imgType)
-        else: 
+        if self.imgType==ImgType.SAT: 
             return SatImg(img, date)
+        else: 
+            return FlowImg(img, date, self.imgType)
 
     def __len__(self):
         return len(self.img_paths)

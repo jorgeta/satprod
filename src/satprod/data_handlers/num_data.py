@@ -27,7 +27,7 @@ class NumericalDataHandler():
     
     def update_formatted_files(self):
         wind_df = self.get_wind_data()
-        wind_df = self.__add_cubed_wind_speed(wind_df)
+        #wind_df = self.__add_cubed_wind_speed(wind_df)
         prod_df = self.get_prod_data()
         df = pd.concat([wind_df,prod_df], axis=1)
         self.write_formatted_data(df, True)
@@ -47,14 +47,14 @@ class NumericalDataHandler():
         df = df.set_index(['time'])
         return df
     
-    def __add_cubed_wind_speed(self, wind_df):
+    '''def __add_cubed_wind_speed(self, wind_df):
         speed_df = get_columns(wind_df, 'speed')
         speed_df = speed_df.pow(3)
         cols = []
         for col in speed_df:
             cols.append(col.replace('speed', 'velocity_cubed'))
         speed_df.columns = cols
-        return pd.concat([wind_df, speed_df], axis=1)
+        return pd.concat([wind_df, speed_df], axis=1)'''
     
     def __read_wind_data(self) -> pd.DataFrame:
         '''
