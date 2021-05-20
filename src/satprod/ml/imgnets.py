@@ -7,8 +7,7 @@ from torchvision.transforms import Normalize
 class LeNet(nn.Module):
     
     def __init__(self, 
-                channels_1: int,
-                channels_2: int,
+                channels: [int],
                 kernel_size_conv: [int],
                 stride_conv: [int],
                 padding_conv: [int],
@@ -17,21 +16,18 @@ class LeNet(nn.Module):
                 padding_pool: [int],
                 height: int,
                 width: int,
-                in_channels: int
                 ):
         super(LeNet, self).__init__()
         
         assert height>0
         assert width>0
-        assert channels_2>0
-        assert channels_1>0
-        assert in_channels>0
+        assert len(channels)==3
         
         self.name = 'LeNet'
         self.height = height
         self.width = width
         
-        self.num_filters_conv = [in_channels, channels_1, channels_2]
+        self.channels = channels
         
         self.kernel_size_conv = kernel_size_conv #[5, 5]
         self.stride_conv = stride_conv #[1, 1]
@@ -42,11 +38,11 @@ class LeNet(nn.Module):
         self.padding_pool = padding_pool#[0, 0]
         
         self.conv1 = nn.Conv2d(
-            in_channels=self.num_filters_conv[0],
-            out_channels=self.num_filters_conv[1],
-            kernel_size=kernel_size_conv[0],
-            stride=stride_conv[0],
-            padding=padding_conv[0]
+            in_channels=self.channels[0],
+            out_channels=self.channels[1],
+            kernel_size=self.kernel_size_conv[0],
+            stride=self.stride_conv[0],
+            padding=self.padding_conv[0]
         )
         
         self.pool1 = nn.MaxPool2d(
@@ -56,8 +52,8 @@ class LeNet(nn.Module):
         )
         
         self.conv2 = nn.Conv2d(
-            in_channels=self.num_filters_conv[1],
-            out_channels=self.num_filters_conv[2],
+            in_channels=self.channels[1],
+            out_channels=self.channels[2],
             kernel_size=kernel_size_conv[1],
             stride=stride_conv[1],
             padding=padding_conv[1]

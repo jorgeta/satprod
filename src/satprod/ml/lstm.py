@@ -3,33 +3,27 @@ import torch
 from torch import nn
 from satprod.ml.imgnets import LeNet, ResNet, DeepSense
 
-class LSTM_net(nn.Module):
+class LSTM(nn.Module):
     
     def __init__(self, 
                 input_size: int, 
                 hidden_size: int, 
                 output_size: int, 
-                num_forecast_features: int,
+                num_forecast_features: int, 
                 num_output_features: int, 
                 num_layers: int, 
-                sequence_len: int,
-                channels_1: int,
-                channels_2: int,
-                kernel_size_conv: [int],
-                stride_conv: [int],
-                padding_conv: [int],
-                kernel_size_pool: [int],
-                stride_pool: [int],
-                padding_pool: [int],
+                sequence_length: int,
                 height: int = 100, 
                 width: int = 100,
                 linear_size: int=0,
                 dropout: float=0.0,
                 initialization: str=None, 
-                activation=None, 
-                in_channels: int=1, 
-                img_extraction_method: str=None):
-        super(LSTM_net, self).__init__()
+                activation=None,
+                img_extraction_method: str=None,
+                lenet_params: dict=None, 
+                resnet_params: dict=None,
+                deepsense_params: dict=None):
+        super(LSTM, self).__init__()
         
         self.name = 'simple_LSTM'
         self.input_size = input_size
@@ -39,14 +33,28 @@ class LSTM_net(nn.Module):
         self.num_forecast_features = num_forecast_features
         self.num_output_features = num_output_features
         self.num_layers = num_layers
-        self.sequence_len = sequence_len
+        self.sequence_length = sequence_length
+        self.num_image_features = 0
+        
+        self.img_extraction_method = img_extraction_method
+        if self.img_extraction_method=='lenet':
+            self.lenet = LeNet(**lenet_params)
+            self.num_image_features = lenet_params['channels'][-1]
+        elif self.img_extraction_method=='resnet':
+            self.resnet = ResNet(**resnet_params)
+            self.num_image_features = resnet_params['output_size']
+        elif img_extraction_method=='deepsense':
+            self.deepsense = DeepSense(**deepsense_params)
+            self.num_image_features = 0
+        else:
+            pass
         
         self.dropout = nn.Dropout(dropout)
         
         if self.num_layers > 1:
-            self.lstm = nn.LSTM(input_size+channels_2, hidden_size, num_layers, batch_first=True, dropout=dropout)
+            self.lstm = nn.LSTM(input_size+self.num_image_features, hidden_size, num_layers, batch_first=True, dropout=dropout)
         else:
-            self.lstm = nn.LSTM(input_size+channels_2, hidden_size, num_layers, batch_first=True)
+            self.lstm = nn.LSTM(input_size+self.num_image_features, hidden_size, num_layers, batch_first=True)
         
         if self.linear_size > 0:
             self.linear1 = nn.Linear(self.hidden_size+self.num_forecast_features, self.linear_size)
@@ -72,24 +80,28 @@ class LSTM_net(nn.Module):
                 nn.init.zeros_(self.linear.bias)
         
         self.activation = activation
-        
-        self.img_extraction_method = img_extraction_method
+    
+    def image_feature_extraction(self, x, x_img):
         if self.img_extraction_method=='lenet':
-            self.lenet = LeNet(
-                channels_1,
-                channels_2,
-                kernel_size_conv,
-                stride_conv,
-                padding_conv,
-                kernel_size_pool,
-                stride_pool,
-                padding_pool,
-                height, 
-                width,
-                in_channels
-            )
+            x_img_features = []
+            for i in range(x_img.shape[1]):
+                img = x_img[:, i, :, :]#.reshape(x_img.shape[0], 1, x_img.shape[2], x_img.shape[3])
+                img = self.lenet(img)
+                x_img_features.append(img)
+            
+            x_img = torch.stack(x_img_features).view(self.batch_size, self.sequence_length, -1)
+            # x_img shape: (batch_size, sequence_length, channels_2)
+            
         else:
-            self.resnet = ResNet(output_size=channels_2)
+            x_img_features = []
+            for i in range(x_img.shape[1]):
+                img = x_img[:, i, :, :, :]#.reshape(x_img.shape[0], 1, x_img.shape[2], x_img.shape[3])
+                img = self.resnet(img)
+                x_img_features.append(img)
+            
+            x_img = torch.stack(x_img_features).view(self.batch_size, self.sequence_length, -1)
+    
+        return torch.cat([x, x_img], dim=2)
     
     def forward(self, x, x_forecasts, x_img):
         
@@ -97,28 +109,9 @@ class LSTM_net(nn.Module):
         # x_forecasts shape: (batch_size, num_forecast_features)
         # x_img shape: (batch_size, sequence_length, img_height, img_width)
             # or (batch_size, sequence_length, img_height, img_width, bands)
-        batch_size = x.shape[0]
+        self.batch_size = x.shape[0]
         if x_img is not None:
-            if self.img_extraction_method=='lenet':
-                x_img_features = []
-                for i in range(x_img.shape[1]):
-                    img = x_img[:, i, :, :]#.reshape(x_img.shape[0], 1, x_img.shape[2], x_img.shape[3])
-                    img = self.lenet(img)
-                    x_img_features.append(img)
-                
-                x_img = torch.stack(x_img_features).view(batch_size, self.sequence_len, -1)
-                # x_img shape: (batch_size, sequence_length, channels_2)
-                
-            else:
-                x_img_features = []
-                for i in range(x_img.shape[1]):
-                    img = x_img[:, i, :, :, :]#.reshape(x_img.shape[0], 1, x_img.shape[2], x_img.shape[3])
-                    img = self.resnet(img)
-                    x_img_features.append(img)
-                
-                x_img = torch.stack(x_img_features).view(batch_size, self.sequence_len, -1)
-        
-            x = torch.cat([x, x_img], dim=2)
+            x = self.image_feature_extraction(x, x_img)
         
         x, _ = self.lstm(x)
         # x.shape: (batch_size, seq_len, hidden_size)
@@ -138,11 +131,7 @@ class LSTM_net(nn.Module):
             x = self.linear(x)
             # x.shape: (batch_size, output_size*num_output_features)
             
-        x = x.view(batch_size, self.output_size, self.num_output_features)
+        x = x.view(self.batch_size, self.output_size, self.num_output_features)
         # x.shape: (batch_size, output_size, num_output_features)
         
         return x
-
-if __name__ =='__main__':
-    lstm = LSTM_net(1,1,1,1,1)
-    print(lstm)

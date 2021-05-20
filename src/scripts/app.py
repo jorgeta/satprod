@@ -5,15 +5,16 @@ import cv2
 import logging
 import pandas as pd
 
-from satprod.configs.config_utils import read_yaml, TimeInterval, ImgType
+from satprod.configs.config_utils import read_yaml, TimeInterval, ImgType, structurize_wind_grid_images
 from satprod.data_handlers.img_data import Img, ImgDataset, SatImg, FlowImg
 from satprod.data_handlers.video import SatVid, FlowVid
 from satprod.optical_flow.optical_flow_optim import OpticalFlowOptim
 from satprod.optical_flow.optical_flow import OpticalFlow
 from satprod.data_handlers.num_data import NumericalDataHandler
-from satprod.configs.config_utils import structurize_wind_grid_images
 from satprod.pipelines.training import train_model
 from satprod.pipelines.evaluation import Evaluate
+from satprod.pipelines.dataset import WindDataset
+from satprod.configs.job_configs import TrainConfig
 
 from tasklog.tasklogger import init_logger
 init_logger()
@@ -141,6 +142,27 @@ class App:
     
     def wind_grid_structurize(self):
         structurize_wind_grid_images()
+    
+    def update_image_indices(self):
+        
+        # dummy train config
+        train_config = TrainConfig(
+            batch_size = 64,
+            num_epochs = 30,
+            learning_rate = 4e-3,
+            scheduler_step_size = 5,
+            scheduler_gamma = 0.8,
+            train_valid_splits = 1,
+            pred_sequence_length = 5,
+            random_seed = 0,
+            parks = ['bess'],
+            num_feature_types = ['speed'],
+            img_features = ['grid'],
+            img_extraction_method = 'lenet'
+        )
+        
+        dataset = WindDataset(train_config)
+        _ = dataset.update_image_indices()
     
 
 def main():

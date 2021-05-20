@@ -14,7 +14,7 @@ from matplotlib import pyplot as plt
 
 from satprod.pipelines.dataset import WindDataset
 
-from satprod.ml.lstm import LSTM_net
+from satprod.ml.lstm import LSTM
 from satprod.ml.agru import AGRU
 from satprod.ml.tcn import TCN
 
@@ -25,15 +25,20 @@ from satprod.pipelines.evaluation import Results, Evaluate, store_results
 from tasklog.tasklogger import logging
 from tqdm import tqdm
 
-def test_forward_pass():
-    raise NotImplementedError
-
 def train_model():
     
-    parks = ['skom']#,'vals','skom','yvik']
-    num_feature_types = ['production', 'speed', 'forecast'] #['forecast', 'direction', 'speed', 'production']
-    img_features = ['grid']
-    img_extraction_method = 'resnet' # lenet, deepsense
+    parks = ['yvik']#,'vals','skom','yvik']
+    num_feature_types = ['production', 'speed'] #['forecast', 'direction', 'speed', 'production']
+    img_features = ['grid']#['grid']
+    img_extraction_method = 'lenet' # lenet, deepsense, resnet
+    
+    lenet_channels = [1, 16, 32]
+    if len(img_features)==0:
+        img_extraction_method = None
+        lenet_channels[-1] = 0
+    if img_extraction_method is None:
+        img_features = []
+        lenet_channels[-1] = 0
     
     train_config = TrainConfig(
         batch_size = 64,
@@ -53,52 +58,65 @@ def train_model():
     # get data
     wind_dataset = WindDataset(train_config)
     
+    # define image extraction parameters
+    lenet_params = {
+        'channels' : lenet_channels,
+        'kernel_size_conv' : [8,4],
+        'stride_conv' : [4,4],
+        'padding_conv' : [0,0],
+        'kernel_size_pool' : [3,2],
+        'stride_pool' : [3,1],
+        'padding_pool' : [0,0],
+        'height' : wind_dataset.img_height,
+        'width' : wind_dataset.img_width
+    }
+    
+    resnet_params = {
+        'output_size' : 32
+    }
+    
+    deepsense_params = {
+        
+    }
+    
     # define model structure
-    sequence_length = 12
-    hidden_size = 16
-    linear_size = 64
-    num_layers = 1
-    channels_1 = 16
-    channels_2 = 32
-    kernel_size_conv = [8,4]
-    stride_conv = [4,4]
-    padding_conv = [0,0]
-    kernel_size_pool = [3,2]
-    stride_pool = [3,1]
-    padding_pool = [0,0]
+    lstm_params = {
+        'sequence_length' : 12,
+        'hidden_size' : 16,
+        'linear_size' : 64,
+        'num_layers' : 1,
+        'input_size' : wind_dataset.n_past_features,
+        'num_forecast_features' : wind_dataset.n_forecast_features,
+        'num_output_features' : wind_dataset.n_output_features,
+        'output_size' : train_config.pred_sequence_length,
+        'initialization' : 'xavier',
+        'activation' : nn.Tanh(),
+        'img_extraction_method': train_config.img_extraction_method,
+        'lenet_params' : lenet_params,
+        'resnet_params' : resnet_params,
+        'deepsense_params' : deepsense_params
+    }
     
+    tcn_encoder_params = {
+        'kernel_size' : [3,3],
+        'stride' : [3,3],
+        'padding' : [0,0],
+        'channels' : [3,6,9],
+        'img_extraction_method': train_config.img_extraction_method,
+        'lenet_params' : lenet_params,
+        'resnet_params' : resnet_params,
+        'deepsense_params' : deepsense_params
+    }
     
-    if len(train_config.img_features)==0: channels_2 = 0
-    num_input_features = wind_dataset.n_past_features
-    num_forecast_features = wind_dataset.n_forecast_features
-    num_output_features = wind_dataset.n_output_features
+    tcn_decoder_params = {
+        
+    }
     
-    net = LSTM_net(
-        input_size=num_input_features,
-        hidden_size=hidden_size,
-        linear_size=linear_size,
-        num_forecast_features=num_forecast_features,
-        output_size=train_config.pred_sequence_length,
-        num_output_features=num_output_features, 
-        num_layers=num_layers, 
-        sequence_len=sequence_length,
-        channels_1=channels_1,
-        channels_2=channels_2,
-        kernel_size_conv=kernel_size_conv,
-        stride_conv=stride_conv,
-        padding_conv=padding_conv,
-        kernel_size_pool=kernel_size_pool,
-        stride_pool=stride_pool,
-        padding_pool=padding_pool,
-        height=wind_dataset.img_height,
-        width=wind_dataset.img_width,
-        initialization='xavier',
-        activation=nn.Tanh(), #nn.ReLU()
-        img_extraction_method=train_config.img_extraction_method
-    )
-    
+    lstm_net = LSTM(**lstm_params)
+    #tcn_net = TCN(tcn_encoder_params, tcn_decoder_params)
+
     # train the model and return the model with the lowest validation error
-    best_model, results = train_loop(net, train_config, wind_dataset)
+    best_model, results = train_loop(lstm_net, train_config, wind_dataset)
     
     now = datetime.now().strftime('%Y-%m-%d-%H-%M')
     
@@ -117,8 +135,8 @@ def train_model():
     evaluate = Evaluate(timestamp=now, model_name=best_model.name, park=park)
     evaluate.plot_errors()
 
-def train_loop(net, train_config, data: WindDataset):
-    sequence_length = net.sequence_len
+def train_loop(net, train_config: TrainConfig, data: WindDataset):
+    sequence_length = net.sequence_length
     pred_sequence_length = train_config.pred_sequence_length
     batch_size = train_config.batch_size
     num_epochs = train_config.num_epochs
@@ -128,10 +146,14 @@ def train_loop(net, train_config, data: WindDataset):
     
     logging.info(net)
     params_in_network = 0
+    trainable_params_in_network = 0
     for name, param in net.named_parameters():
         if param.requires_grad:
-            params_in_network += len(np.ravel(param.data.numpy()))
+            trainable_params_in_network += len(np.ravel(param.data.numpy()))
             print(param.data.numpy().shape)
+        params_in_network += len(np.ravel(param.data.numpy()))
+        
+    logging.info(f'Trainable parameters in network: {trainable_params_in_network}.')
     logging.info(f'Parameters in network: {params_in_network}.')
     
     criterion = nn.L1Loss()
@@ -145,6 +167,7 @@ def train_loop(net, train_config, data: WindDataset):
     np.random.seed(train_config.random_seed)
 
     results = Results(
+        trainable_params_in_network = trainable_params_in_network,
         params_in_network = params_in_network,
         epoch = 0,
         lowest_valid_mae = np.inf,
@@ -170,12 +193,12 @@ def train_loop(net, train_config, data: WindDataset):
         step_size=train_config.scheduler_step_size, 
         gamma=train_config.scheduler_gamma
     )
-    '''
+    
     num_batches_train = 2
     train_indices = train_indices[:(num_batches_train+1)*batch_size]
     num_batches_valid = 2
     valid_indices = valid_indices[:(num_batches_valid+1)*batch_size]
-    '''
+    
     
     def get_sequenced_data(batch_indices):
         input_data_array = []
@@ -256,7 +279,6 @@ def train_loop(net, train_config, data: WindDataset):
                 X_batch_img = Variable(X_batch_img).float().to(device)
             
             output = net(X_batch, X_batch_forecasts, X_batch_img)
-            
             
             # compute gradients given loss
             batch_loss = criterion(output, y_batch)
@@ -350,23 +372,3 @@ def temporary_plot(results: Results, val_targs, val_preds):
     plt.show(block=False)
     plt.pause(0.25)
     plt.close()
-
-
-'''
-i = 0
-    for img_feature in wind_dataset.img_features:
-        idx = int(wind_dataset[i][img_feature])
-        img_dataset = wind_dataset.img_datasets[img_feature]
-        #print(img_handler[idx].img)
-'''
-
-
-'''if epoch==num_epochs-1:
-                for h in range(len(X_batch)):
-                    plt.scatter(np.arange(len(X_batch[h].numpy()[:,3])), X_batch[h].numpy()[:,3], label='X')
-                    plt.scatter(len(X_batch[h].numpy()[:,3]), y_batch.data[h].numpy(), label='y_targ')
-                    plt.scatter(len(X_batch[h].numpy()[:,3]), output.data[h].numpy(), label='y_pred')
-                    plt.legend()
-                    plt.show(block=False)
-                    plt.pause(0.05)
-                    plt.close()'''

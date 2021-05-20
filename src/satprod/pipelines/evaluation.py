@@ -10,7 +10,6 @@ import pickle
 
 from satprod.configs.config_utils import TimeInterval
 from satprod.configs.job_configs import TrainConfig
-from satprod.ml.lstm import LSTM_net
 from satprod.pipelines.dataset import WindDataset
 from satprod.data_handlers.data_utils import get_columns
 
@@ -19,6 +18,7 @@ from tasklog.tasklogger import logging
 @dataclass
 class Results():
     params_in_network: int
+    trainable_params_in_network: int
     epoch: int
     lowest_valid_mae: float
     corr_train_mae: float
@@ -84,7 +84,8 @@ class Evaluate():
     
     def info(self, to_console: bool=False):
         info_str = f'\nTimestamp: {self.timestamp}\nPark: {self.park}\nModel: {self.model_name}'
-        info_str += f'\nParams in network: {self.results.params_in_network}'
+        info_str = f'\nTrainable parameters in network: {self.results.trainable_params_in_network}'
+        info_str += f'\nParameters in network: {self.results.params_in_network}'
         info_str += f'\nLowest validation MAE: {self.results.lowest_valid_mae}'
         info_str += f'\nCorresponding train MAE: {self.results.corr_train_mae}'
         info_str += f'\nEpoch of lowest validation MAE: {self.results.epoch}'

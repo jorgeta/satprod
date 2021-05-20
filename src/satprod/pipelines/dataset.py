@@ -19,12 +19,8 @@ class WindDataset(torch.utils.data.Dataset):
     def __init__(self, train_config: TrainConfig):
         cd = str(os.path.dirname(os.path.abspath(__file__)))
         self.root = f'{cd}/../../..'
-        self.formatted_data_path = os.path.join(self.root, 'data', 'formatted')
         
-        try:
-            self.img_extraction_method = train_config.img_extraction_method
-        except:
-            self.img_extraction_method = 'lenet'
+        self.img_extraction_method = train_config.img_extraction_method
         self.parks=train_config.parks
         self.num_feature_types=train_config.num_feature_types
         self.img_features=train_config.img_features
@@ -33,39 +29,40 @@ class WindDataset(torch.utils.data.Dataset):
         
         # get numerical data
         num = NumericalDataHandler()
-        num_data = num.read_formatted_data(nan=False)
+        self.num_data = num.read_formatted_data()
+        self.formatted_data_path = num.formatted_data_path
         
         # select wanted features
         park_data = []
         for park in self.parks:
             if park=='skom' and 'bess' not in self.parks:
-                park_data.append(get_columns(num_data, 'bess'))
+                park_data.append(get_columns(self.num_data, 'bess'))
                 park_data[-1] = park_data[-1].drop(columns='production_bess')
-                park_data.append(get_columns(num_data, park))
+                park_data.append(get_columns(self.num_data, park))
             else:
-                park_data.append(get_columns(num_data, park))
-        num_data = pd.concat(park_data, axis=1)
+                park_data.append(get_columns(self.num_data, park))
+        self.num_data = pd.concat(park_data, axis=1)
         for feature_type in ['speed', 'direction']:
             if feature_type not in self.num_feature_types:
-                num_data = num_data.drop(columns=get_columns(num_data, feature_type).columns.values)
+                self.num_data = self.num_data.drop(columns=get_columns(self.num_data, feature_type).columns.values)
         if 'forecast' not in self.num_feature_types:
-            num_data = num_data.drop(columns=get_columns(num_data,'+'))
+            self.num_data = self.num_data.drop(columns=get_columns(self.num_data,'+'))
         else:
             # remove forecasts that go beyond the prediction sequence length
             forecasts_removed = False
             hour = train_config.pred_sequence_length+1
             while not forecasts_removed:
                 identifier = '+' + str(hour)
-                columns_to_drop = get_columns(num_data,identifier).columns
+                columns_to_drop = get_columns(self.num_data,identifier).columns
                 if len(columns_to_drop)==0:
                     forecasts_removed = True
                 else:
-                    num_data = num_data.drop(columns=columns_to_drop)
+                    self.num_data = self.num_data.drop(columns=columns_to_drop)
                     hour += 1
                 
         
         # target labels
-        self.target_labels = list(get_columns(num_data,'production').columns)
+        self.target_labels = list(get_columns(self.num_data,'production').columns)
         
         # image data
         try:
@@ -74,7 +71,7 @@ class WindDataset(torch.utils.data.Dataset):
             img_data.index = pd.to_datetime(img_data.index)
         except:
             # create img data dataset, write to file, and return set
-            img_data = self.update_image_indices(num_data)
+            img_data = self.update_image_indices(self.num_data)
         
         # image datasets
         self.img_datasets = {}
@@ -95,10 +92,10 @@ class WindDataset(torch.utils.data.Dataset):
             self.img_width = 0
         
         # save unscaled data
-        self.data_unscaled = pd.concat([num_data, img_data], axis=1)
+        self.data_unscaled = pd.concat([self.num_data, img_data], axis=1)
         
         # must be called in init
-        self.__split_and_scale_data(num_data, img_data)
+        self.__split_and_scale_data(self.num_data, img_data)
         
         # some useful measurements
         self.n_image_features = len(img_data.columns)
@@ -107,7 +104,7 @@ class WindDataset(torch.utils.data.Dataset):
         self.n_output_features = len(self.target_labels)
         
         
-    def update_image_indices(self, num_data):
+    def update_image_indices(self):
         
         # all possible image features
         img_features = [
@@ -120,10 +117,11 @@ class WindDataset(torch.utils.data.Dataset):
             'lk_sparse', 
             'lk_sparsemask'
         ]
-        img_data = pd.DataFrame(index=num_data.index, columns=img_features)
+        img_data = pd.DataFrame(index=self.num_data.index, columns=img_features)
         
         img_datasets = {}
         for col in img_data.columns:
+            logging.info(f'Updating image indices in column: {col}')
             try:
                 img_datasets[col] = ImgDataset(ImgType(col), normalize=True)
         
