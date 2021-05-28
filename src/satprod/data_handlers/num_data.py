@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
 import os
+from sklearn.linear_model import LinearRegression
 
 from satprod.data_handlers.data_utils import sin_transform, cos_transform, get_columns
 
@@ -9,7 +10,7 @@ from tasklog.tasklogger import logging
 
 class NumericalDataHandler():
 
-    def __init__(self, pred_limit: int=5, train_test_split: datetime=datetime(2020,5,1,0)):
+    def __init__(self, pred_horizon: int=5, valid_start_date: datetime=datetime(2019, 5, 13, 0)):
         cd = str(os.path.dirname(os.path.abspath(__file__)))
         self.root = f'{cd}/../../..'
         self.parks = ['bess', 'skom', 'vals', 'yvik']
@@ -24,8 +25,8 @@ class NumericalDataHandler():
         os.makedirs(f'{self.old_raw_data_path}', exist_ok=True)
         os.makedirs(f'{self.formatted_data_path}', exist_ok=True)
         
-        self.pred_limit = pred_limit
-        self.train_test_split = train_test_split
+        self.pred_horizon = pred_horizon
+        self.valid_start_date = valid_start_date
         
         # treat inf values as NaN
         pd.options.mode.use_inf_as_na = True
@@ -35,34 +36,35 @@ class NumericalDataHandler():
     
     def update_formatted_files(self):
         wind_df = self.get_wind_data()
-        #wind_df = self.__add_cubed_wind_speed(wind_df)
+        
         prod_df = self.get_prod_data()
-        df = pd.concat([wind_df,prod_df], axis=1)
+        logging.info('Removing first half year of production data at the different parks.')
+        for park in self.parks:
+            prod_df[f'production_{park}'].iloc[:24*183] = np.nan
+        
+        logging.info('Replacing outliers with NaN.')
+        prod_df = self.__clean_prod_data(prod_df)
+        
+        df = pd.concat([wind_df, prod_df], axis=1).asfreq('H')
         self.write_formatted_data(df, nan=True)
-        #df = self.fill_missing_values(df)
-        # drop skom wind data because they're the same as for bess
-        #df = df.drop(columns=get_columns(wind_df, 'skom').columns)
-        #self.write_formatted_data(df, False)
+        
+        # fill isolated missing values
+        prod_df = self.__fill_missing_prod_values(prod_df, wind_df)
+        df = pd.concat([wind_df, prod_df], axis=1).asfreq('H')
+        self.write_formatted_data(df, nan=False)
     
     def write_formatted_data(self, df: pd.DataFrame, nan: bool):
-        filename = 'df_nan' if nan else 'df_no_nan'
+        filename = 'df_nan' if nan else 'df_filled'
         df.to_csv(f'{self.formatted_data_path}/{filename}.csv')
         
-    def read_formatted_data(self) -> pd.DataFrame:
-        filename = 'df_nan'
+    def read_formatted_data(self, nan: bool=False) -> pd.DataFrame:
+        filename = 'df_nan' if nan else 'df_filled'
         df = pd.read_csv(f'{self.formatted_data_path}/{filename}.csv')
         df['time'] = pd.to_datetime(df['time'])
         df = df.set_index(['time'])
         return df
     
-    def read_old_formatted_data(self, nan: bool) -> pd.DataFrame:
-        filename = 'df_nan' if nan else 'df_no_nan'
-        df = pd.read_csv(f'{self.old_formatted_data_path}/{filename}.csv')
-        df['time'] = pd.to_datetime(df['time'])
-        df = df.set_index(['time'])
-        return df
-    
-    def __read_wind_data(self) -> pd.DataFrame:
+    def get_wind_data(self) -> pd.DataFrame:
         weather = {}
         for park in self.parks:
             if park=='skom': continue
@@ -92,18 +94,23 @@ class NumericalDataHandler():
         # fill in NaN values where there are missing values
         df = df.asfreq(freq='H')
         
-        logging.info('Done reading wind data.')
-        return df
-    
-    def get_wind_data(self) -> pd.DataFrame():
+        # remove time zone information since all data is in UTC
+        df = df.tz_localize(None)
         
-        df = self.__read_wind_data()
-        
+        # convert wind direction in degrees into two features representing cosine and sine of the degrees
         for park in self.parks:
             if park=='skom': continue
             df = self.__direction_transforms(df, f'wind_direction_{park}')
-            
-        df = df.tz_localize(None)
+        
+        # add forecast features ('wind_speed_bess+1h', 'wind_direction_bess_cos+1h', ...)
+        df = self.__add_forecasts_to_wind_data(df)
+        
+        return df
+    
+    def __add_forecasts_to_wind_data(self, df: pd.DataFrame) -> pd.DataFrame():
+        for col in df.columns:
+            for i in range(1, self.pred_horizon+1):
+                df[f'{col}+{i}h'] = df[col].shift(periods=-i)
         return df
         
     def __direction_transforms(self, df: pd.DataFrame, column: str) -> pd.DataFrame:
@@ -114,11 +121,11 @@ class NumericalDataHandler():
         df = df.drop(columns=[column])
         return df
     
-    def __read_prod_data(self) -> pd.DataFrame():
+    def get_prod_data(self) -> pd.DataFrame():
         # read raw production data
         prod = {}
         for park in self.parks:
-            prod[park] = pd.read_csv(f'{self.raw_prod_data_path}/{park}_prod.csv')
+            prod[park] = pd.read_csv(f'{self.raw_prod_data_path}/{park}_prod_total.csv')
             prod[park].time = pd.to_datetime(prod[park].time)
             prod[park] = prod[park].set_index(['time'])
             prod[park].columns = [f'production_{park}']
@@ -128,19 +135,74 @@ class NumericalDataHandler():
         
         return df
     
-    def get_prod_data(self) -> pd.DataFrame():
+    def __clean_prod_data(self, prod_df) -> pd.DataFrame():
+        # lower limit values found by plotting data
+        limits = {'bess': 0.0, 'vals': -0.1, 'skom': -0.23, 'yvik': -0.01}
         
-        df = self.__read_prod_data()
+        for col in prod_df.columns:
+            park = col.split('_')[-1]
+            prod_df[col][prod_df[col] < limits[park]] = np.nan
         
-        logging.info('Removing clearly untrue production values at Ytre Vikna.')
-        df.production_yvik.loc['2019-12-16 10:00:00':] = np.nan
+        # remove a bit more than a year of data with more production than the other years at Valsneset
+        max_production_vals = prod_df.production_vals.iloc[-24*365*5:].max() # find max production over last five years
         
-        logging.info('Removing first half year of production data at the different parks.')
-        for park in self.parks:
-            df[f'production_{park}'].iloc[:24*183] = np.nan
+        max_values_vals = prod_df.production_vals[prod_df.production_vals > max_production_vals]
+        removal_interval_vals = (max_values_vals.index[0], max_values_vals.index[-1])
         
-        return df
+        prod_df.production_vals = pd.concat([
+            prod_df.production_vals[:removal_interval_vals[0]-timedelta(hours=24)],
+            prod_df.production_vals[removal_interval_vals[1]+timedelta(hours=24):]
+        ], axis=0).asfreq('H')
+        
+        return prod_df
     
+    def __get_isolated_nans(self, prod_df, col) -> pd.DataFrame():
+        mask_repeat_NaN = prod_df.groupby(prod_df[col].notna().cumsum())[col].transform('size').le(2)
+        mask = mask_repeat_NaN&prod_df[col].isna()
+        return pd.DataFrame(data=prod_df[mask][col])
+    
+    def __fill_missing_prod_values(self, prod_df, wind_df) -> pd.DataFrame():
+        for park in self.parks:
+            if park=='skom':
+                park_name = 'bess'
+            else:
+                park_name = park
+            
+            df_nans = self.__get_isolated_nans(prod_df, f'production_{park}')
+            df_nans = df_nans.loc[:self.valid_start_date]
+            
+            # use all data until valid set, do regression
+            wind_df_park = get_columns(wind_df, park_name)
+            wind_df_park = wind_df_park.drop(columns=get_columns(wind_df_park, '+').columns)
+
+            X = pd.concat([
+                prod_df[f'production_{park}'],
+                wind_df_park
+            ], axis=1).dropna(axis=0)
+            
+            X = X.loc[:self.valid_start_date]
+            
+            feature = X[f'wind_speed_{park_name}'].values.reshape(-1, 1)
+            target = X[f'production_{park}'].values
+            
+            linear = LinearRegression().fit(feature, target)
+            
+            wind_speeds = np.zeros(len(df_nans))
+            for i, index in enumerate(df_nans.index):
+                wind_speeds[i] = wind_df[f'wind_speed_{park_name}'].loc[index]
+            wind_speeds = wind_speeds.reshape(-1, 1)
+            
+            # predict values for times at df_nans, update df_nans to have values
+            linear_preds = np.ravel(linear.predict(wind_speeds))
+            
+            df_nans[f'production_{park}'] = linear_preds
+            
+            logging.info(f'Filled {len(linear_preds)} missing production values with linear approximations at {park}.')
+            
+            prod_df[f'production_{park}'].update(df_nans[f'production_{park}'])
+        
+        return prod_df
+    '''''
     def __infer_missing_prod_value(self, df: pd.DataFrame, time: datetime, park: str, real_prod_exists=False, only_use_seen_data=False):
         time_str = time.strftime("%Y-%m-%d %H:%M:%S")
         
@@ -181,13 +243,12 @@ class NumericalDataHandler():
         for i, index in enumerate(df[f'production_{park}'][
             df[f'production_{park}'].isna()].index):
             df[f'production_{park}'].loc[index] = model_preds[i]
-        return df
+        return df'''''
     
-    def fill_missing_values(self, df: pd.DataFrame=None):
+    '''def fill_missing_values(self, df: pd.DataFrame=None):
         
         if df is None:
-            df = self.read_formatted_data(nan=True)
-        df = df[df.index < self.train_test_split]
+            df = self.read_formatted_data()
         
         df = df.dropna(subset=get_columns(df, 'wind').columns)
         
@@ -202,11 +263,17 @@ class NumericalDataHandler():
         
         df = df.asfreq('H')
         
-        return df
+        return df'''
 
 
     '''Handling of old data'''
     
+    def read_old_formatted_data(self, nan: bool) -> pd.DataFrame:
+        filename = 'df_nan' if nan else 'df_no_nan'
+        df = pd.read_csv(f'{self.old_formatted_data_path}/{filename}.csv')
+        df['time'] = pd.to_datetime(df['time'])
+        df = df.set_index(['time'])
+        return df
     
     def __read_old_wind_data(self) -> pd.DataFrame:
         '''
@@ -276,7 +343,7 @@ class NumericalDataHandler():
         # insert empty rows for the hours without data
         df = df.asfreq(freq='H')
 
-        # in case of more than pred_limit rows with nan values, we only want to fill up to pred_limit
+        # in case of more than pred_horizon rows with nan values, we only want to fill up to pred_horizon
         #nan_row_counter = 0
 
         logging.info('Filling wind prediction dataframe using forecasts.')
@@ -299,7 +366,7 @@ class NumericalDataHandler():
         now_df = df.copy()
         forecast_df = df.copy()
         for col in forecast_df.columns:
-            if col[1] > self.pred_limit or col[1] < 1:
+            if col[1] > self.pred_horizon or col[1] < 1:
                 forecast_df = forecast_df.drop(columns=col)
             if col[1] > 0:
                 now_df = now_df.drop(columns=col)
@@ -350,10 +417,10 @@ if __name__=='__main__':
     
     wind = num.get_wind_data()
     
-    print(wind.columns)
-    print(wind)
+    #print(wind.columns)
+    #print(wind)
     
-    prod = num.get_prod_data()
+    #prod = num.get_prod_data()
     
     #print(prod.columns)
     #print(prod)

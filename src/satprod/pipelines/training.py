@@ -27,10 +27,11 @@ from tqdm import tqdm
 
 def train_model():
     
-    parks = ['yvik']#,'vals','skom','yvik']
-    num_feature_types = ['production', 'speed'] #['forecast', 'direction', 'speed', 'production']
+    parks = ['skom']#,'vals','skom','yvik']
+    num_feature_types = ['production', 'speed', 'forecast'] #['forecast', 'direction', 'speed', 'production']
     img_features = ['grid']#['grid']
     img_extraction_method = 'lenet' # lenet, deepsense, resnet
+    train_on_small_subset = True
     
     lenet_channels = [1, 16, 32]
     if len(img_features)==0:
@@ -42,17 +43,17 @@ def train_model():
     
     train_config = TrainConfig(
         batch_size = 64,
-        num_epochs = 30,
+        num_epochs = 300,
         learning_rate = 4e-3,
-        scheduler_step_size = 5,
-        scheduler_gamma = 0.8,
-        train_valid_splits = 1,
+        scheduler_step_size = 20,
+        scheduler_gamma = 0.9,
         pred_sequence_length = 5,
         random_seed = 0,
         parks = parks,
         num_feature_types = num_feature_types,
         img_features = img_features,
-        img_extraction_method = img_extraction_method
+        img_extraction_method = img_extraction_method,
+        train_on_small_subset = train_on_small_subset
     )
     
     # get data
@@ -82,7 +83,7 @@ def train_model():
     # define model structure
     lstm_params = {
         'sequence_length' : 12,
-        'hidden_size' : 16,
+        'hidden_size' : 32,
         'linear_size' : 64,
         'num_layers' : 1,
         'input_size' : wind_dataset.n_past_features,
@@ -185,6 +186,14 @@ def train_loop(net, train_config: TrainConfig, data: WindDataset):
     num_samples_valid = len(valid_indices)
     num_batches_valid = num_samples_valid // batch_size
     
+    if train_config.train_on_small_subset:
+        num_batches_train = 2
+        train_indices = train_indices[:(num_batches_train+1)*batch_size]
+        num_samples_train = len(train_indices)
+        num_batches_valid = 2
+        valid_indices = valid_indices[:(num_batches_valid+1)*batch_size]
+        num_samples_valid = len(valid_indices)
+    
     logging.info(f'Number of train and valid samples: {num_samples_train}, {num_samples_valid}')
     logging.info(f'Number of train and valid batches: {num_batches_train}, {num_batches_valid}')
     
@@ -194,13 +203,7 @@ def train_loop(net, train_config: TrainConfig, data: WindDataset):
         gamma=train_config.scheduler_gamma
     )
     
-    num_batches_train = 2
-    train_indices = train_indices[:(num_batches_train+1)*batch_size]
-    num_batches_valid = 2
-    valid_indices = valid_indices[:(num_batches_valid+1)*batch_size]
-    
-    
-    def get_sequenced_data(batch_indices):
+    def get_sequenced_data(batch_indices: [int]):
         input_data_array = []
         target_data_array = []
         forecast_data_array = []
@@ -314,6 +317,7 @@ def train_loop(net, train_config: TrainConfig, data: WindDataset):
             valid_batch_indices = valid_indices[i*batch_size:(i+1)*batch_size]
             
             X_batch, X_batch_forecasts, X_batch_img, y_batch = get_sequenced_data(valid_batch_indices)
+            
             if X_batch is None: continue
             current_batch_size = X_batch.shape[0]
             

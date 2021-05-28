@@ -143,6 +143,10 @@ class WindDataset(torch.utils.data.Dataset):
     def __split_and_scale_data(self, num_data, img_data):
         # num_data_train_scaled, num_data_valid_scaled, test sets
         
+        # drop irrelevant data before production data is available
+        num_data = num_data.dropna(axis=0).asfreq('H')
+        img_data = img_data.dropna(axis=0).asfreq('H')
+        
         num_data_train_scaled = num_data[num_data.index < self.valid_start]
         #self.img_data_train = self.img_data[self.img_data.index < self.valid_start]
         
@@ -187,8 +191,7 @@ class WindDataset(torch.utils.data.Dataset):
         #num_data_scaled = pd.concat([num_data_train_scaled, num_data_valid_scaled, test], axis=0)
         
         self.data = pd.concat([num_data_scaled, img_data], axis=1)
-        self.data = self.data.dropna(axis=0)
-        self.data = self.data.asfreq('H')
+        self.data = self.data.dropna(axis=0).asfreq('H')
         
     def __getitem__(self, idx: int):
         return self.data.iloc[idx]

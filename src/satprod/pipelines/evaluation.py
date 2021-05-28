@@ -69,6 +69,9 @@ class Evaluate():
         self.info()
         self.unscale_val_predictions()
         self.create_error_matrix()
+        self.baseline_comparisons()
+        self.plot_fitting_example()
+        self.plot_training_curve()
     
     def get_stored_results(self):
         self.path = f'{self.root}/storage/{self.park}/{self.model_name}/{self.timestamp}'
@@ -125,8 +128,8 @@ class Evaluate():
         self.val_targs_unscaled = val_targs
         self.val_preds_unscaled = val_preds
         self.val_prediction_interval = TimeInterval(
-            start=self.wind_dataset.valid_start+timedelta(hours=self.net.sequence_len), 
-            stop=self.wind_dataset.valid_start+timedelta(hours=self.net.sequence_len+len(val_preds)-1)
+            start=self.wind_dataset.valid_start+timedelta(hours=self.net.sequence_length), 
+            stop=self.wind_dataset.valid_start+timedelta(hours=self.net.sequence_length+len(val_preds)-1)
         )
         
         #(384, 5, 4)
@@ -191,57 +194,65 @@ class Evaluate():
         
         # get wind_speeds and wind speed forecasts
         speed = get_columns(self.wind_dataset.data_unscaled, 'speed')
-        wind_speed_forecasts = get_columns(get_columns(self.wind_dataset.data_unscaled,'speed'), '+')
-        val_wind_forecasts = wind_speed_forecasts.loc[self.val_prediction_interval.start:self.val_prediction_interval.stop].values
-        while val_wind_forecasts.ndim < 3:
-            val_wind_forecasts = val_wind_forecasts[..., np.newaxis]
-        speed = speed.drop(columns=wind_speed_forecasts.columns)
-        prod = get_columns(self.wind_dataset.data_unscaled, 'production')
-        
-        speed_prod = pd.concat([speed, prod], axis=1).dropna(axis=0)
-        speed_prod = speed_prod[speed_prod.index < self.wind_dataset.valid_start]
-        
-        preds = np.zeros_like(val_wind_forecasts)
-        
-        for i in range(preds.shape[0]):
-            for j in range(preds.shape[1]):
-                for k in range(preds.shape[2]):
-                    wind_forecast = val_wind_forecasts[i][j][k]
-                    park = self.train_config.parks[k]
-                    
-                    similar_situation_production_avg = []
-                    while len(similar_situation_production_avg)==0:
-                        if park=='skom':
-                            similar_situation_production_avg = speed_prod[
-                                (speed_prod[f'wind_speed_bess'] > lower_percent*wind_forecast) & (speed_prod[f'wind_speed_bess'] < upper_percent*wind_forecast)
-                                ][f'production_skom'].values
-                        else:
-                            similar_situation_production_avg = speed_prod[
-                                (speed_prod[f'wind_speed_{park}'] > lower_percent*wind_forecast) & (speed_prod[f'wind_speed_{park}'] < upper_percent*wind_forecast)
-                                ][f'production_{park}'].values
-                        lower_percent -= 0.1
-                        upper_percent += 0.1
-                    
-                    lower_percent = lower_percent_standard
-                    upper_percent = upper_percent_standard
-                    preds[i, j, k] = np.mean(similar_situation_production_avg)
-        
-        self.avg_of_history_error_matrix = np.zeros((self.val_targs_unscaled.shape[1], self.val_targs_unscaled.shape[2]))
-        for i in range(self.avg_of_history_error_matrix.shape[0]):
-            for j in range(self.avg_of_history_error_matrix.shape[1]):
-                self.avg_of_history_error_matrix[i][j] = mean_absolute_error(self.val_targs_unscaled[:,i,j], preds[:,i,j])
+        #print(speed)
+        wind_speed_forecasts = get_columns(speed, '+')
+        if wind_speed_forecasts.empty:
+            self.avg_of_history_error_matrix = None
+        else:
+            val_wind_forecasts = wind_speed_forecasts.loc[self.val_prediction_interval.start:self.val_prediction_interval.stop].values
+            
+            while val_wind_forecasts.ndim < 3:
+                val_wind_forecasts = val_wind_forecasts[..., np.newaxis]
+            speed = speed.drop(columns=wind_speed_forecasts.columns)
+            prod = get_columns(self.wind_dataset.data_unscaled, 'production')
+            
+            speed_prod = pd.concat([speed, prod], axis=1).dropna(axis=0)
+            speed_prod = speed_prod[speed_prod.index < self.wind_dataset.valid_start]
+            
+            preds = np.zeros_like(val_wind_forecasts)
+            
+            for i in range(preds.shape[0]):
+                for j in range(preds.shape[1]):
+                    for k in range(preds.shape[2]):
+                        wind_forecast = val_wind_forecasts[i][j][k]
+                        park = self.train_config.parks[k]
+                        
+                        similar_situation_production_avg = []
+                        while len(similar_situation_production_avg)==0:
+                            if park=='skom':
+                                similar_situation_production_avg = speed_prod[
+                                    (speed_prod[f'wind_speed_bess'] > lower_percent*wind_forecast) & (speed_prod[f'wind_speed_bess'] < upper_percent*wind_forecast)
+                                    ][f'production_skom'].values
+                            else:
+                                similar_situation_production_avg = speed_prod[
+                                    (speed_prod[f'wind_speed_{park}'] > lower_percent*wind_forecast) & (speed_prod[f'wind_speed_{park}'] < upper_percent*wind_forecast)
+                                    ][f'production_{park}'].values
+                            lower_percent -= 0.1
+                            upper_percent += 0.1
+                        
+                        lower_percent = lower_percent_standard
+                        upper_percent = upper_percent_standard
+                        preds[i, j, k] = np.mean(similar_situation_production_avg)
+            
+            self.avg_of_history_error_matrix = np.zeros((self.val_targs_unscaled.shape[1], self.val_targs_unscaled.shape[2]))
+            for i in range(self.avg_of_history_error_matrix.shape[0]):
+                for j in range(self.avg_of_history_error_matrix.shape[1]):
+                    self.avg_of_history_error_matrix[i][j] = mean_absolute_error(self.val_targs_unscaled[:,i,j], preds[:,i,j])
     
     def baseline_comparisons(self):
         self.persistence()
         self.avg_of_history_model()
         
         logging.info(f'Persistence MAEs:\n{self.persistence_error_matrix}')
-        logging.info(f'Average history based model MAEs:\n{self.avg_of_history_error_matrix}')
+        if self.avg_of_history_error_matrix is not None:
+            logging.info(f'Average history based model MAEs:\n{self.avg_of_history_error_matrix}')
         logging.info(f'{self.model_name} MAEs:\n{self.error_matrix}')
         
         labels = ['1', '2', '3', '4', '5']
         per = np.ravel(self.persistence_error_matrix)
-        lin = np.ravel(self.avg_of_history_error_matrix)
+        if self.avg_of_history_error_matrix is not None:
+            lin = np.ravel(self.avg_of_history_error_matrix)
+        else: lin = None
         lstm = np.ravel(self.error_matrix)
 
         x = np.arange(len(labels))  # the label locations
@@ -249,7 +260,8 @@ class Evaluate():
 
         fig, ax = plt.subplots()
         rects1 = ax.bar(x - width/2, per, width, label='Persistence')
-        rects2 = ax.bar(x, lin, width, label='Linear')
+        if lin is not None:
+            rects2 = ax.bar(x, lin, width, label='Linear')
         rects3 = ax.bar(x + width/2, lstm, width, label='LSTM')
 
         # Add some text for labels, title and custom x-axis tick labels, etc.
