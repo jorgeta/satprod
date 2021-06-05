@@ -31,8 +31,8 @@ def train_model():
     num_feature_types = ['production', 'speed', 'direction'] #['forecast', 'direction', 'speed', 'production']
     use_numerical_forecasts = True
     use_img_forecasts = True
-    img_features = []#['grid'] # [] or ['grid']
-    img_extraction_method = 'lenet' # lenet, deepsense, resnet
+    img_features = ['grid'] # [] or ['grid']
+    img_extraction_method = 'resnet' # lenet, deepsense, resnet
     train_on_small_subset = False
     
     model = 'TCN' #'LSTM' # 'TCN', 'AGRU'
@@ -50,7 +50,7 @@ def train_model():
     train_config = TrainConfig(
         model = model,
         batch_size = 64,
-        num_epochs = 15,
+        num_epochs = 30,
         learning_rate = 4e-3,
         scheduler_gamma = 0.9,
         pred_sequence_length = 5,
@@ -81,7 +81,7 @@ def train_model():
     }
     
     resnet_params = {
-        'output_size' : 32
+        'output_size' : 8
     }
     
     deepsense_params = {
@@ -107,7 +107,7 @@ def train_model():
     }
     
     tcn_params = {
-        'channels' : [1, 32, 32, 1],
+        'channels' : [1, 8, 8, 1],
         'num_past_features': wind_dataset.n_past_features,
         'num_unique_forecast_features': wind_dataset.n_unique_forecast_features,
         'output_size': wind_dataset.n_output_features,

@@ -71,7 +71,7 @@ class TCN(nn.Module):
         
         self.dilated_tcn = nn.ModuleList(cnn_sequences)
         #self.identity = nn.Identity()
-        self.relu = nn.ReLU()
+        #self.relu = nn.ReLU()
         self.linear = nn.Linear(
             in_features = self.num_past_features+self.num_image_features+self.num_unique_forecast_features, 
             out_features = self.output_size
@@ -124,14 +124,17 @@ class TCN(nn.Module):
             tcn_outputs.append(self.dilated_tcn[i](x[:, :, i].unsqueeze(1)).squeeze(2))
         
         tcn_output = torch.cat(tcn_outputs, dim=1)
+        #print(tcn_output.shape)
         output_with_forecasts = torch.cat([tcn_output, x_forecast], dim=1)
-        
+        '''print(output_with_forecasts.shape)
+        print(self.num_past_features)
+        print(self.num_image_features)'''
         #identity_output = self.identity(x[:,-1,:])
         #print(tcn_output.shape)
         
         #print(identity_output.shape)
         
-        activation_output = tcn_output#+identity_output)
+        #activation_output = tcn_output#+identity_output)
         #print(activation_output.shape)
         return self.linear(output_with_forecasts)
     

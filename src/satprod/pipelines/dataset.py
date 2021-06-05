@@ -107,11 +107,18 @@ class WindDataset(torch.utils.data.Dataset):
         self.__split_and_scale_data(self.num_data, img_data)
         
         # some useful measurements
-        self.n_image_features = len(img_data.columns)
-        self.n_forecast_features = len(get_columns(self.data, '+').columns)
-        self.n_unique_forecast_features = len(get_columns(self.data, '+1h').columns)
-        self.n_past_features = len(self.data.columns)-self.n_forecast_features-self.n_image_features
+        self.n_image_features = len(self.img_features)
+        self.n_forecast_features = len(get_columns(self.num_data, '+').columns)
+        self.n_unique_forecast_features = len(get_columns(self.num_data, '+1h').columns)
+        self.n_past_features = len(self.num_data.columns)-self.n_forecast_features-self.n_image_features
         self.n_output_features = len(self.target_labels)
+        
+        '''print(self.data.columns)
+        print(self.n_image_features)
+        print(self.n_forecast_features)
+        print(self.n_unique_forecast_features)
+        print(self.n_past_features)
+        print(self.n_output_features)'''
         
     def update_image_indices(self):
         
