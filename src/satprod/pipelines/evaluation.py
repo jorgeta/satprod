@@ -127,10 +127,6 @@ class Evaluate():
         
         self.val_targs_unscaled = val_targs
         self.val_preds_unscaled = val_preds
-        self.val_prediction_interval = TimeInterval(
-            start=self.wind_dataset.valid_start+timedelta(hours=self.net.sequence_length), 
-            stop=self.wind_dataset.valid_start+timedelta(hours=self.net.sequence_length+len(val_preds)-1)
-        )
         
         #(384, 5, 4)
         
@@ -171,21 +167,25 @@ class Evaluate():
         
         # get relevant production
         prod = get_columns(self.wind_dataset.data_unscaled, 'production')
-        prod = prod[prod.index >= self.wind_dataset.valid_start]
-        prod = prod[prod.index < self.wind_dataset.test_start]
         prod_columns = prod.columns
         
         self.persistence_error_matrix = np.zeros_like(self.error_matrix) #(5,4)
         
         for i in range(self.train_config.pred_sequence_length):
+            for col in prod_columns:
+                prod[f'{col}_shift({i+1})'] = prod[col].shift(i+1).values
+        prod = prod.loc[
+            self.train_config.valid_start:self.train_config.test_start-timedelta(hours=1)
+        ].dropna(axis=0)
+        
+        for i in range(self.train_config.pred_sequence_length):
             for j, col in enumerate(prod_columns):
-                preds = prod[col].shift(1).loc[self.val_prediction_interval.start:self.val_prediction_interval.stop]
-                targs = prod[col].shift(-i).loc[self.val_prediction_interval.start:self.val_prediction_interval.stop]
-                self.persistence_error_matrix[i,j] = mean_absolute_error(preds, targs)
+                self.persistence_error_matrix[i,j] = mean_absolute_error(
+                    prod[col].values, prod[f'{col}_shift({i+1})'].values)
         
         self.persistence_total_mae = np.mean(np.ravel(self.persistence_error_matrix))
     
-    def avg_of_history_model(self):
+    '''def avg_of_history_model(self):
         upper_percent_standard = 1.1
         lower_percent_standard = 0.9
         
@@ -199,7 +199,7 @@ class Evaluate():
         if wind_speed_forecasts.empty:
             self.avg_of_history_error_matrix = None
         else:
-            val_wind_forecasts = wind_speed_forecasts.loc[self.val_prediction_interval.start:self.val_prediction_interval.stop].values
+            val_wind_forecasts = wind_speed_forecasts.loc[self.train_config.valid_start:self.train_config.test_start-timedelta(hours=1)].values
             
             while val_wind_forecasts.ndim < 3:
                 val_wind_forecasts = val_wind_forecasts[..., np.newaxis]
@@ -237,11 +237,11 @@ class Evaluate():
             self.avg_of_history_error_matrix = np.zeros((self.val_targs_unscaled.shape[1], self.val_targs_unscaled.shape[2]))
             for i in range(self.avg_of_history_error_matrix.shape[0]):
                 for j in range(self.avg_of_history_error_matrix.shape[1]):
-                    self.avg_of_history_error_matrix[i][j] = mean_absolute_error(self.val_targs_unscaled[:,i,j], preds[:,i,j])
+                    self.avg_of_history_error_matrix[i][j] = mean_absolute_error(self.val_targs_unscaled[:,i,j], preds[:,i,j])'''
     
     def baseline_comparisons(self):
         self.persistence()
-        self.avg_of_history_model()
+        self.avg_of_history_error_matrix = None
         
         logging.info(f'Persistence MAEs:\n{self.persistence_error_matrix}')
         if self.avg_of_history_error_matrix is not None:
@@ -262,7 +262,7 @@ class Evaluate():
         rects1 = ax.bar(x - width/2, per, width, label='Persistence')
         if lin is not None:
             rects2 = ax.bar(x, lin, width, label='Linear')
-        rects3 = ax.bar(x + width/2, lstm, width, label='LSTM')
+        rects3 = ax.bar(x + width/2, lstm, width, label=f'{self.model_name}')
 
         # Add some text for labels, title and custom x-axis tick labels, etc.
         ax.set_ylabel('MAE')

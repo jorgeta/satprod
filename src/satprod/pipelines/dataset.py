@@ -23,6 +23,8 @@ class WindDataset(torch.utils.data.Dataset):
         self.img_extraction_method = train_config.img_extraction_method
         self.parks=train_config.parks
         self.num_feature_types=train_config.num_feature_types
+        self.use_numerical_forecasts = train_config.use_numerical_forecasts
+        self.use_img_forecasts = train_config.use_img_forecasts
         self.img_features=train_config.img_features
         self.valid_start=train_config.valid_start
         self.test_start=train_config.test_start
@@ -34,6 +36,7 @@ class WindDataset(torch.utils.data.Dataset):
         
         # select wanted features
         park_data = []
+        
         for park in self.parks:
             if park=='skom' and 'bess' not in self.parks:
                 park_data.append(get_columns(self.num_data, 'bess'))
@@ -41,11 +44,12 @@ class WindDataset(torch.utils.data.Dataset):
                 park_data.append(get_columns(self.num_data, park))
             else:
                 park_data.append(get_columns(self.num_data, park))
+        
         self.num_data = pd.concat(park_data, axis=1)
         for feature_type in ['speed', 'direction']:
             if feature_type not in self.num_feature_types:
                 self.num_data = self.num_data.drop(columns=get_columns(self.num_data, feature_type).columns.values)
-        if 'forecast' not in self.num_feature_types:
+        if not self.use_numerical_forecasts:
             self.num_data = self.num_data.drop(columns=get_columns(self.num_data,'+'))
         else:
             # remove forecasts that go beyond the prediction sequence length
@@ -84,6 +88,11 @@ class WindDataset(torch.utils.data.Dataset):
                 else:
                     self.img_datasets[col] = ImgDataset(ImgType(col), normalize=True, grayscale=True)
         
+        if self.use_img_forecasts:
+            for col in img_data.columns:
+                for i in range(train_config.pred_sequence_length):
+                    img_data[f'{col}+{i+1}h'] = img_data[col].shift(-i-1)
+        
         if len(self.img_features)>0:
             self.img_height = self.img_datasets[self.img_features[0]][0].height
             self.img_width = self.img_datasets[self.img_features[0]][0].width
@@ -100,9 +109,9 @@ class WindDataset(torch.utils.data.Dataset):
         # some useful measurements
         self.n_image_features = len(img_data.columns)
         self.n_forecast_features = len(get_columns(self.data, '+').columns)
+        self.n_unique_forecast_features = len(get_columns(self.data, '+1h').columns)
         self.n_past_features = len(self.data.columns)-self.n_forecast_features-self.n_image_features
         self.n_output_features = len(self.target_labels)
-        
         
     def update_image_indices(self):
         

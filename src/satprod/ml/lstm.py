@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 from torch import nn
-from satprod.ml.imgnets import LeNet, ResNet, DeepSense
+from satprod.ml.imgnets import LeNet, ResNet, DeepSense, image_feature_extraction
 
 class LSTM(nn.Module):
     
@@ -81,29 +81,7 @@ class LSTM(nn.Module):
         
         self.activation = activation
     
-    def image_feature_extraction(self, x, x_img):
-        if self.img_extraction_method=='lenet':
-            x_img_features = []
-            for i in range(x_img.shape[1]):
-                img = x_img[:, i, :, :]#.reshape(x_img.shape[0], 1, x_img.shape[2], x_img.shape[3])
-                img = self.lenet(img)
-                x_img_features.append(img)
-            
-            x_img = torch.stack(x_img_features).view(self.batch_size, self.sequence_length, -1)
-            # x_img shape: (batch_size, sequence_length, channels_2)
-            
-        else:
-            x_img_features = []
-            for i in range(x_img.shape[1]):
-                img = x_img[:, i, :, :, :]#.reshape(x_img.shape[0], 1, x_img.shape[2], x_img.shape[3])
-                img = self.resnet(img)
-                x_img_features.append(img)
-            
-            x_img = torch.stack(x_img_features).view(self.batch_size, self.sequence_length, -1)
-    
-        return torch.cat([x, x_img], dim=2)
-    
-    def forward(self, x, x_forecasts, x_img):
+    def forward(self, x, x_forecasts, x_img, x_last_production):
         
         # x shape: (batch_size, sequence_length, num_past_features)
         # x_forecasts shape: (batch_size, num_forecast_features)
@@ -111,7 +89,8 @@ class LSTM(nn.Module):
             # or (batch_size, sequence_length, img_height, img_width, bands)
         self.batch_size = x.shape[0]
         if x_img is not None:
-            x = self.image_feature_extraction(x, x_img)
+            x_img = image_feature_extraction(x_img, self)
+            x = torch.cat([x, x_img], dim=2)
         
         x, _ = self.lstm(x)
         # x.shape: (batch_size, seq_len, hidden_size)
@@ -119,7 +98,7 @@ class LSTM(nn.Module):
         x = x[:, -1, :]
         # x.shape: (batch_size, hidden_size)
         if x_forecasts is not None:
-            x = torch.cat([x, x_forecasts], dim=1)
+            x = torch.cat([x, x_forecasts.view(batch_size, -1)], dim=1)
         
         if self.linear_size > 0:
             x = self.activation(self.linear1(x))

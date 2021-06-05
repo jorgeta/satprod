@@ -155,7 +155,7 @@ class ImgDataset(torch.utils.data.Dataset):
                 path2datetime(self.img_paths[i][len(self.imgroot):]) for i in range(len(self.img_paths))
             ]
         except:
-            logging.warning('Cannot call dataset of dense and sparse optical flow images when there are none.')
+            logging.warning(f'Cannot call dataset since there are noe images of type {imgType.value}.')
             exit()
 
     def __getitem__(self, idx: int):

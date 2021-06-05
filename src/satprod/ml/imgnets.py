@@ -121,6 +121,7 @@ class ResNet(nn.Module):
     
     def __init__(self, output_size):
         super(ResNet, self).__init__()
+        self.name = 'ResNet'
         self.resnet18 = resnet18(pretrained=True)
         for param in self.resnet18.parameters():
             param.requires_grad = False
@@ -140,5 +141,26 @@ class ResNet(nn.Module):
 class DeepSense(nn.Module):
     def __init__(self):
         super(DeepSense, self).__init__()
+        self.name = 'DeepSense'
         
         raise NotImplementedError
+
+def image_feature_extraction(x_img, net):
+    if net.img_extraction_method=='lenet':
+        x_img_features = []
+        for i in range(x_img.shape[1]):
+            img = x_img[:, i, :, :]
+            img = net.lenet(img)
+            x_img_features.append(img)
+        
+    elif net.img_extraction_method=='resnet':
+        x_img_features = []
+        for i in range(x_img.shape[1]):
+            img = x_img[:, i, :, :, :]
+            img = net.resnet(img)
+            x_img_features.append(img)
+    
+    else:
+        raise NotImplementedError()
+
+    return torch.stack(x_img_features).view(x_img.shape[0], x_img.shape[1], -1)
