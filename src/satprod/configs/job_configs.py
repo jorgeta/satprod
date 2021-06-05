@@ -5,13 +5,12 @@ from datetime import datetime
 class TrainConfig():
     model: str
     learning_rate: int
-    scheduler_step_size: int
-    scheduler_gamma: float
     pred_sequence_length: int
     parks: [str]
     num_feature_types: [str]
     img_features: [str]
     img_extraction_method: str
+    scheduler_gamma: float = 0.5
     train_on_small_subset: bool = False
     use_numerical_forecasts: bool = True
     use_img_forecasts: bool = False
@@ -25,6 +24,8 @@ class TrainConfig():
     def __post_init__(self):
         assert len(self.img_features)<=1, "Not more than one image can be used at a time."
         assert len(self.parks)==1 or len(self.parks)==4, "Choose either one or all parks."
+        
+        self.scheduler_step_size = int(0.9*self.num_epochs)
         
         if self.model=='TCN':
             self.recursive = True

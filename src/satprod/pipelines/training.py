@@ -52,7 +52,6 @@ def train_model():
         batch_size = 64,
         num_epochs = 15,
         learning_rate = 4e-3,
-        scheduler_step_size = 2,
         scheduler_gamma = 0.9,
         pred_sequence_length = 5,
         random_seed = 0,
@@ -127,7 +126,7 @@ def train_model():
         net = LSTM(**lstm_params)
     else:
         exit()
-
+    
     # train the model and return the model with the lowest validation error
     best_model, results = train_loop(net, train_config, wind_dataset)
     
@@ -156,15 +155,17 @@ def train_loop(net, train_config: TrainConfig, data: WindDataset):
     
     # set device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    logging.info(f'Device: {device}')
+    net.to(device)
     
     #logging.info(net)
     params_in_network = 0
     trainable_params_in_network = 0
     for name, param in net.named_parameters():
         if param.requires_grad:
-            trainable_params_in_network += len(np.ravel(param.data.numpy()))
+            trainable_params_in_network += len(np.ravel(param.data.cpu().numpy()))
             #print(name, param.data.numpy().shape)
-        params_in_network += len(np.ravel(param.data.numpy()))
+        params_in_network += len(np.ravel(param.data.cpu().numpy()))
         
     logging.info(f'Trainable parameters in network: {trainable_params_in_network}.')
     logging.info(f'Parameters in network: {params_in_network}.')
@@ -266,8 +267,8 @@ def train_loop(net, train_config: TrainConfig, data: WindDataset):
             
             output = net(X_batch, X_batch_forecasts, X_batch_img, X_last_production, X_batch_img_forecasts)
             
-            train_targs += list(y_batch.data.numpy())
-            train_preds += list(output.data.numpy())
+            train_targs += list(y_batch.data.cpu().numpy())
+            train_preds += list(output.data.cpu().numpy())
         
         ## Evaluate validation
         val_preds, val_targs = [], []
@@ -287,8 +288,8 @@ def train_loop(net, train_config: TrainConfig, data: WindDataset):
             
             output = net(X_batch, X_batch_forecasts, X_batch_img, X_last_production, X_batch_img_forecasts)
             
-            val_targs += list(y_batch.data.numpy())
-            val_preds += list(output.data.numpy())
+            val_targs += list(y_batch.data.cpu().numpy())
+            val_preds += list(output.data.cpu().numpy())
         
         train_mae_cur = mean_absolute_error(np.ravel(train_targs), np.ravel(train_preds))
         valid_mae_cur = mean_absolute_error(np.ravel(val_targs), np.ravel(val_preds))
