@@ -10,7 +10,7 @@ from torch.autograd import Variable
 from torch.optim.lr_scheduler import StepLR
 from sklearn.metrics import mean_absolute_error
 from matplotlib import pyplot as plt
-#import pickle
+import pickle
 
 from satprod.pipelines.dataset import WindDataset
 
@@ -28,14 +28,14 @@ from tqdm import tqdm
 def train_model():
     
     parks = ['skom']#, ['bess', 'vals','skom','yvik']
-    num_feature_types = ['production', 'speed', 'direction'] #['forecast', 'direction', 'speed', 'production']
+    num_feature_types = ['production', 'speed', 'direction'] #['direction', 'speed', 'production']
     use_numerical_forecasts = True
     use_img_forecasts = True
-    img_features = ['grid'] # [] or ['grid']
+    img_features = ['grid']#['grid'] # [] or ['grid']
     img_extraction_method = 'resnet' # lenet, deepsense, resnet
     train_on_small_subset = False
     
-    model = 'TCN' #'LSTM' # 'TCN', 'AGRU'
+    model = 'LSTM' #'LSTM' # 'TCN', 'AGRU'
     
     lenet_channels = [1, 16, 32]
     if len(img_features)==0:
@@ -306,7 +306,10 @@ def train_loop(net, train_config: TrainConfig, data: WindDataset):
             results.val_targs = val_targs
             results.corr_train_preds = train_preds
             results.train_targs = train_targs
-            best_model = deepcopy(net)
+            
+            # save the model with the lowest valid error to file
+            with open(f'best_model.pickle', 'wb') as model_file:
+                pickle.dump(net, model_file)
         
         scheduler.step()
         
@@ -315,6 +318,10 @@ def train_loop(net, train_config: TrainConfig, data: WindDataset):
         
         logging.info('Epoch %2i : Train MAE %f, Valid MAE %f' % (epoch+1, train_mae_cur, valid_mae_cur))
     
+    with open(f'best_model.pickle', 'rb') as model_file:
+        best_model = pickle.load(model_file)
+    
+    os.remove(f'best_model.pickle')
     return best_model, results
 
 def get_sequenced_data(batch_indices: [int], sequence_length: int, train_config: TrainConfig, data: WindDataset, device):

@@ -25,7 +25,7 @@ class LSTM(nn.Module):
                 deepsense_params: dict=None):
         super(LSTM, self).__init__()
         
-        self.name = 'simple_LSTM'
+        self.name = 'LSTM'
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.linear_size = linear_size
@@ -52,53 +52,69 @@ class LSTM(nn.Module):
         self.dropout = nn.Dropout(dropout)
         
         if self.num_layers > 1:
-            self.lstm = nn.LSTM(input_size+self.num_image_features, hidden_size, num_layers, batch_first=True, dropout=dropout)
+            self.lstm = nn.LSTM(self.input_size+self.num_image_features, 
+                                hidden_size, num_layers, batch_first=True, dropout=dropout)
         else:
-            self.lstm = nn.LSTM(input_size+self.num_image_features, hidden_size, num_layers, batch_first=True)
+            self.lstm = nn.LSTM(self.input_size+self.num_image_features, 
+                                hidden_size, num_layers, batch_first=True)
         
         if self.linear_size > 0:
             self.linear1 = nn.Linear(self.hidden_size+self.num_forecast_features, self.linear_size)
             self.linear2 = nn.Linear(self.linear_size, self.output_size*self.num_output_features)
         else:
-            self.linear = nn.Linear(self.hidden_size+self.num_forecast_features, self.output_size*self.num_output_features)
+            self.linear = nn.Linear(
+                self.hidden_size+self.num_forecast_features, 
+                self.output_size*self.num_output_features)
         
         if initialization=='xavier':
-            for param in self.lstm.parameters():
-                if len(param.shape) >= 2:
-                    nn.init.xavier_normal_(param)
-                else:
-                    nn.init.normal_(param)
-            
-            if self.linear_size > 0:
-                nn.init.xavier_normal_(self.linear1.weight)
-                nn.init.zeros_(self.linear1.bias)
-                
-                nn.init.xavier_normal_(self.linear2.weight)
-                nn.init.zeros_(self.linear2.bias)
-            else:
-                nn.init.xavier_normal_(self.linear.weight)
-                nn.init.zeros_(self.linear.bias)
+            self.init_parameters()
         
         self.activation = activation
+        
+    def init_parameters(self):
+        for param in self.lstm.parameters():
+            if len(param.shape) >= 2:
+                nn.init.xavier_normal_(param)
+            else:
+                nn.init.normal_(param)
+        
+        if self.linear_size > 0:
+            nn.init.xavier_normal_(self.linear1.weight)
+            nn.init.zeros_(self.linear1.bias)
+            
+            nn.init.xavier_normal_(self.linear2.weight)
+            nn.init.zeros_(self.linear2.bias)
+        else:
+            nn.init.xavier_normal_(self.linear.weight)
+            nn.init.zeros_(self.linear.bias)
+            
+    def init_hidden_state(self, batch_size):
+        self.hidden = (
+            torch.zeros(1, batch_size, self.hidden_size),
+            torch.zeros(1, batch_size, self.hidden_size)
+        )
     
-    def forward(self, x, x_forecasts, x_img, x_last_production):
+    def forward(self, x, x_forecasts, x_img, x_last_production, x_img_forecasts):
         
         # x shape: (batch_size, sequence_length, num_past_features)
         # x_forecasts shape: (batch_size, num_forecast_features)
         # x_img shape: (batch_size, sequence_length, img_height, img_width)
             # or (batch_size, sequence_length, img_height, img_width, bands)
+        
         self.batch_size = x.shape[0]
+        self.init_hidden_state(self.batch_size)
+        
         if x_img is not None:
             x_img = image_feature_extraction(x_img, self)
             x = torch.cat([x, x_img], dim=2)
         
-        x, _ = self.lstm(x)
+        x, self.hidden = self.lstm(x, self.hidden)
         # x.shape: (batch_size, seq_len, hidden_size)
 
         x = x[:, -1, :]
         # x.shape: (batch_size, hidden_size)
         if x_forecasts is not None:
-            x = torch.cat([x, x_forecasts.view(batch_size, -1)], dim=1)
+            x = torch.cat([x, x_forecasts.view(self.batch_size, -1)], dim=1)
         
         if self.linear_size > 0:
             x = self.activation(self.linear1(x))

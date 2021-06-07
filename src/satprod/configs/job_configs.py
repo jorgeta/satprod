@@ -26,6 +26,8 @@ class TrainConfig():
         assert len(self.parks)==1 or len(self.parks)==4, "Choose either one or all parks."
         
         self.scheduler_step_size = int(0.9*self.num_epochs)
+        if self.scheduler_step_size < 1:
+            self.scheduler_step_size = 1
         
         if self.model=='TCN':
             self.recursive = True
