@@ -94,7 +94,7 @@ class LSTM(nn.Module):
             torch.zeros(1, batch_size, self.hidden_size)
         )
     
-    def forward(self, x, x_forecasts, x_img, x_last_production, x_img_forecasts):
+    def forward(self, x, x_forecasts, x_img):
         
         # x shape: (batch_size, sequence_length, num_past_features)
         # x_forecasts shape: (batch_size, num_forecast_features)
