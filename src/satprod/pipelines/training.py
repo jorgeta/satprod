@@ -241,7 +241,9 @@ def train_loop(net, train_config: TrainConfig, data: WindDataset):
                 # train only on one step ahead
                 output = net(X_batch, X_batch_forecasts, X_batch_img, X_last_production, X_batch_img_forecasts, y_batch)
             else:
-                output = net(X_batch, X_batch_forecasts, X_batch_img, X_last_production, X_batch_img_forecasts)
+                if train_config.model=='LSTM':
+                    output = net(X_batch, X_batch_forecasts, X_batch_img)
+                
             
             # compute gradients given loss
             batch_loss = criterion(output, y_batch)
@@ -265,7 +267,10 @@ def train_loop(net, train_config: TrainConfig, data: WindDataset):
             if X_batch is None: continue
             current_batch_size = X_batch.shape[0]
             
-            output = net(X_batch, X_batch_forecasts, X_batch_img, X_last_production, X_batch_img_forecasts)
+            if train_config.model=='LSTM':
+                output = net(X_batch, X_batch_forecasts, X_batch_img)
+            else:
+                output = net(X_batch, X_batch_forecasts, X_batch_img, X_last_production, X_batch_img_forecasts)
             
             train_targs += list(y_batch.data.cpu().numpy())
             train_preds += list(output.data.cpu().numpy())
@@ -286,7 +291,10 @@ def train_loop(net, train_config: TrainConfig, data: WindDataset):
             if X_batch is None: continue
             current_batch_size = X_batch.shape[0]
             
-            output = net(X_batch, X_batch_forecasts, X_batch_img, X_last_production, X_batch_img_forecasts)
+            if train_config.model=='LSTM':
+                output = net(X_batch, X_batch_forecasts, X_batch_img)
+            else:
+                output = net(X_batch, X_batch_forecasts, X_batch_img, X_last_production, X_batch_img_forecasts)
             
             val_targs += list(y_batch.data.cpu().numpy())
             val_preds += list(output.data.cpu().numpy())
