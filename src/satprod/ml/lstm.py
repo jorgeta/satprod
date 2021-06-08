@@ -88,11 +88,11 @@ class LSTM(nn.Module):
             nn.init.xavier_normal_(self.linear.weight)
             nn.init.zeros_(self.linear.bias)
             
-    def init_hidden_state(self, batch_size):
+    '''def init_hidden_state(self, batch_size: int):
         self.hidden = (
             torch.zeros(1, batch_size, self.hidden_size),
             torch.zeros(1, batch_size, self.hidden_size)
-        )
+        )'''
     
     def forward(self, x, x_forecasts, x_img):
         
@@ -102,13 +102,13 @@ class LSTM(nn.Module):
             # or (batch_size, sequence_length, img_height, img_width, bands)
         
         self.batch_size = x.shape[0]
-        self.init_hidden_state(self.batch_size)
+        #self.init_hidden_state(self.batch_size)
         
         if x_img is not None:
             x_img = image_feature_extraction(x_img, self)
             x = torch.cat([x, x_img], dim=2)
         
-        x, self.hidden = self.lstm(x, self.hidden)
+        x, _ = self.lstm(x)
         # x.shape: (batch_size, seq_len, hidden_size)
 
         x = x[:, -1, :]
