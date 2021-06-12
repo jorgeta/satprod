@@ -1,1 +1,57 @@
 app: satprod
+
+model: 'LSTM' #'LSTM', 'TCN', 'AGRU', 'TCN_Bai', 'MLR'
+train_on_one_batch: True
+
+data_config:
+  parks: ['skom'] # ['bess', 'vals','skom','yvik']
+  numerical_features: ['production', 'speed', 'direction']
+  use_img_features: True
+  img_extraction_method: 'lenet' # 'lenet', 'deepsense', 'resnet'
+  
+  pred_sequence_length: 5
+  use_numerical_forecasts: True
+  use_img_forecasts: True
+  
+  valid_start: {'year': 2019, 'month': 5, 'day': 12, 'hour': 0}
+  test_start: {'year': 2020, 'month': 5, 'day': 12, 'hour': 0}
+  test_end: {'year': 2021, 'month': 5, 'day': 11, 'hour': 23}
+
+train_config:
+  batch_size: 64
+  num_epochs: 1
+  learning_rate: 4.0e-3
+  scheduler_gamma: 0.9
+  random_seed: 0
+
+img_extraction_methods:
+  lenet:
+    channels: [1, 16, 32]
+    kernel_size_conv: [8, 4]
+    stride_conv: [4, 4]
+    padding_conv: [0, 0]
+    kernel_size_pool: [3, 2]
+    stride_pool: [3, 1]
+    padding_pool: [0, 0]
+  resnet:
+    output_size: 8
+
+models:
+  lstm:
+    sequence_length: 12
+    hidden_size: 32
+    linear_size: 64
+    num_layers: 1
+    dropout: 0.0
+  tcn:
+    channels: [32, 32, 32]
+    kernel_size: 3
+    dilation_base: 2
+    dropout: 0.0
+  tcn_bai:
+    channels: [32, 32, 32]
+    kernel_size: 3
+    dropout: 0.0
+  mlr:
+    sequence_length: 1
+

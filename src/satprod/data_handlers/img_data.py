@@ -189,4 +189,4 @@ class ImgDataset(torch.utils.data.Dataset):
 
 if __name__=='__main__':
     data = ImgDataset(ImgType('sat'))
-    print(data[0].date)
+    print(len(data))

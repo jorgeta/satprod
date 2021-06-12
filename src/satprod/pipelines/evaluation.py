@@ -9,7 +9,7 @@ from matplotlib import pyplot as plt
 import pickle
 
 from satprod.configs.config_utils import TimeInterval
-from satprod.configs.job_configs import TrainConfig
+from satprod.configs.job_configs import TrainConfig, DataConfig
 from satprod.pipelines.dataset import WindDataset
 from satprod.data_handlers.data_utils import get_columns
 
@@ -28,16 +28,21 @@ class Results():
     val_targs: [float]
     corr_train_preds: [float]
     train_targs: [float]
+    test_mae: float
+    test_preds: [float]
+    test_targs: [float]
 
 def store_results(
-    timestamp: str, 
     model, 
     train_config: TrainConfig, 
+    data_config: DataConfig, 
     results: Results, 
     scaler,
     target_label_indices: [int]):
     
-    if len(train_config.parks)==1: park = train_config.parks[0]
+    timestamp = datetime.now().strftime('%Y-%m-%d-%H-%M')
+    
+    if len(data_config.parks)==1: park = data_config.parks[0]
     else: park = 'all'
     
     cd = str(os.path.dirname(os.path.abspath(__file__)))
@@ -45,13 +50,18 @@ def store_results(
     path = f'{root}/storage/{park}/{model.name}/{timestamp}'
     os.makedirs(path, exist_ok=True)
     
-    info = (model, results, train_config, scaler, target_label_indices)
+    info = (model, results, train_config, data_config, scaler, target_label_indices)
     with open(f'{path}/model_results_config.pickle', 'wb') as storage_file:
         pickle.dump(info, storage_file)
 
 class Evaluate():
     
-    def __init__(self, timestamp: str, model_name: str, park: str):
+    def __init__(self, timestamp: str, model_name: str, park: str,
+                save_info_file: bool=True,
+                run_persistence: bool=True,
+                save_error_plots: bool=True,
+                save_fitting_examples: bool=True
+                ):
         cd = str(os.path.dirname(os.path.abspath(__file__)))
         self.root = f'{cd}/../../..'
         self.timestamp = timestamp
@@ -66,17 +76,58 @@ class Evaluate():
         }
         
         self.get_stored_results()
-        self.info()
-        self.unscale_val_predictions()
-        self.create_error_matrix()
-        self.baseline_comparisons()
-        self.plot_fitting_example()
+        
+        self.train_preds_unscaled, self.train_targs_unscaled = self.unscale_predictions(
+            self.results.corr_train_preds, 
+            self.results.train_targs
+        )
+        
+        self.valid_preds_unscaled, self.valid_targs_unscaled = self.unscale_predictions(
+            self.results.best_val_preds, 
+            self.results.val_targs
+        )
+        
+        self.test_preds_unscaled, self.test_targs_unscaled = self.unscale_predictions(
+            self.results.test_preds, 
+            self.results.test_targs
+        )
+        
+        self.train_mae, self.train_error_matrix = self.get_errors(self.train_preds_unscaled, self.train_targs_unscaled)
+        self.valid_mae, self.valid_error_matrix = self.get_errors(self.valid_preds_unscaled, self.valid_targs_unscaled)
+        self.test_mae, self.test_error_matrix = self.get_errors(self.test_preds_unscaled, self.test_targs_unscaled)
+        
+        logging.info(f'{self.model_name} Valid MAEs:\n{self.valid_error_matrix}')
+        
+        if save_error_plots:
+            self.plot_errors(self.train_error_matrix, 'train', self.train_mae)
+            self.plot_errors(self.valid_error_matrix, 'valid', self.valid_mae)
+            self.plot_errors(self.test_error_matrix, 'test', self.test_mae)
+        
+        if run_persistence:
+            self.persistence_train_mae, self.persistence_train_error_matrix = self.persistence('train')
+            self.persistence_valid_mae, self.persistence_valid_error_matrix = self.persistence('valid')
+            self.persistence_test_mae, self.persistence_test_error_matrix = self.persistence('test')
+            
+            logging.info(f'Persistence Valid MAEs:\n{self.persistence_valid_error_matrix}')
+            
+            self.baseline_comparisons(self.train_error_matrix, self.persistence_train_error_matrix, 'train')
+            self.baseline_comparisons(self.valid_error_matrix, self.persistence_valid_error_matrix, 'valid')
+            self.baseline_comparisons(self.test_error_matrix, self.persistence_test_error_matrix, 'test')
+        
+        if save_fitting_examples:
+            self.plot_fitting_example(self.train_preds_unscaled, self.train_targs_unscaled, 'train')
+            self.plot_fitting_example(self.valid_preds_unscaled, self.valid_targs_unscaled, 'valid')
+            self.plot_fitting_example(self.test_preds_unscaled, self.test_targs_unscaled, 'test')
+        
         self.plot_training_curve()
+        
+        if save_info_file:
+            self.info()
     
     def get_stored_results(self):
         self.path = f'{self.root}/storage/{self.park}/{self.model_name}/{self.timestamp}'
         with open(f'{self.path}/model_results_config.pickle', 'rb') as storage_file:
-            net, results, train_config, scaler, target_label_indices = pickle.load(storage_file)
+            net, results, train_config, data_config, scaler, target_label_indices = pickle.load(storage_file)
             
         self.net = net
         self.results = results
@@ -99,161 +150,117 @@ class Evaluate():
         for key, value in vars(self.train_config).items():
             info_str += f'\n{key}: {value}'
         
+        info_str += f'\nTrain MAEs:\n{self.train_error_matrix}'
+        info_str += f'\nValid MAEs:\n{self.valid_error_matrix}'
+        info_str += f'\nTest MAEs:\n{self.test_error_matrix}'
+        
+        try:
+            info_str += f'\nPersistence Train MAEs:\n{self.persistence_train_error_matrix}'
+            info_str += f'\nPersistence Valid MAEs:\n{self.persistence_valid_error_matrix}'
+            info_str += f'\nPersistence Test MAEs:\n{self.persistence_test_error_matrix}'
+        except:
+            pass
+        
         if to_console: logging.info(info_str)
         
         with open(f'{self.path}/info.txt', 'w') as info_file:
             info_file.write(info_str)
     
-    def unscale_val_predictions(self):
-        val_preds = np.array(self.results.best_val_preds)
-        val_targs = np.array(self.results.val_targs)
-        #train_preds = np.array(self.results.corr_train_preds)
-        #train_targs = np.array(self.results.train_targs)
+    def unscale_predictions(self, best_preds, targs):
+        preds = np.array(best_preds)
+        targs = np.array(targs)
         
         means = [self.scaler.mean_[x] for x in self.target_label_indices]
         stds = [self.scaler.scale_[x] for x in self.target_label_indices]
         
         for step in range(self.train_config.pred_sequence_length):
             
-            preds = val_preds[:, step, :]
-            targs = val_targs[:, step, :]
+            p = preds[:, step, :]
+            t = targs[:, step, :]
             
-            for park_idx in range(preds.shape[1]):
-                preds[:,park_idx] = preds[:,park_idx]*stds[park_idx]+means[park_idx]
-                targs[:,park_idx] = targs[:,park_idx]*stds[park_idx]+means[park_idx]
+            for park_idx in range(p.shape[1]):
+                p[:,park_idx] = p[:,park_idx]*stds[park_idx]+means[park_idx]
+                t[:,park_idx] = t[:,park_idx]*stds[park_idx]+means[park_idx]
             
-            val_preds[:, step, :] = preds
-            val_targs[:, step, :] = targs
+            preds[:, step, :] = p
+            targs[:, step, :] = t
         
-        self.val_targs_unscaled = val_targs
-        self.val_preds_unscaled = val_preds
+        return preds, targs
         
-        #(384, 5, 4)
+    def get_errors(self, preds_unscaled, targs_unscaled):
+        mae = mean_absolute_error(np.ravel(targs_unscaled), np.ravel(preds_unscaled))
         
-        logging.info(f'Shape of validation predictions: {self.val_preds_unscaled.shape}')
-        
-    def create_error_matrix(self):
-        self.total_mae = mean_absolute_error(np.ravel(self.val_targs_unscaled), np.ravel(self.val_preds_unscaled))
-        
-        error_matrix = np.zeros((self.val_targs_unscaled.shape[1], self.val_targs_unscaled.shape[2]))
+        error_matrix = np.zeros((targs_unscaled.shape[1], targs_unscaled.shape[2]))
         for i in range(error_matrix.shape[0]):
             for j in range(error_matrix.shape[1]):
-                error_matrix[i][j] = mean_absolute_error(self.val_targs_unscaled[:,i,j], self.val_preds_unscaled[:,i,j])
+                error_matrix[i][j] = mean_absolute_error(targs_unscaled[:,i,j], preds_unscaled[:,i,j])
         
-        self.error_matrix = error_matrix
+        return mae, error_matrix
         
-    def plot_errors(self):
-        fig, axs = plt.subplots(self.error_matrix.shape[1], 1, constrained_layout=True)
+    def plot_errors(self, error_matrix: [[float]], dataset_name: str, total_mae: float):
+        fig, axs = plt.subplots(error_matrix.shape[1], 1, constrained_layout=True)
         
-        if self.error_matrix.shape[1]==1:
+        if error_matrix.shape[1]==1:
             axis = []
             axis.append(axs)
         else:
             axis = axs
         
         fig.suptitle('MAE')
-        for i in range(self.error_matrix.shape[1]):
-            axis[i].bar(range(self.error_matrix.shape[0]), self.error_matrix.T[i], align='center')
-            axis[i].set_title(self.train_config.parks[i])
+        for i in range(error_matrix.shape[1]):
+            axis[i].bar(range(error_matrix.shape[0]), error_matrix.T[i], align='center')
+            axis[i].set_title(f'{self.train_config.parks[i]} - total {dataset_name} MAE: {total_mae}')
             axis[i].set_xlabel('hours ahead')
             axis[i].set_ylabel('MAE')
-            axis[i].set_xticks(range(self.error_matrix.shape[0]))
-            axis[i].set_xticklabels([f'{h+1}' for h in range(self.error_matrix.shape[0])])
-        plt.savefig(f'{self.path}/validation_maes.png')
+            axis[i].set_xticks(range(error_matrix.shape[0]))
+            axis[i].set_xticklabels([f'{h+1}' for h in range(error_matrix.shape[0])])
+        plt.savefig(f'{self.path}/{dataset_name}_maes.png')
         plt.close()
         #plt.show()
     
-    def persistence(self):
+    def persistence(self, dataset_name: str):
         
         # get relevant production
         prod = get_columns(self.wind_dataset.data_unscaled, 'production')
         prod_columns = prod.columns
         
-        self.persistence_error_matrix = np.zeros_like(self.error_matrix) #(5,4)
+        persistence_error_matrix = np.zeros_like(self.train_error_matrix) #(5,4)
         
         for i in range(self.train_config.pred_sequence_length):
             for col in prod_columns:
                 prod[f'{col}_shift({i+1})'] = prod[col].shift(i+1).values
-        prod = prod.loc[
-            self.train_config.valid_start:self.train_config.test_start-timedelta(hours=1)
-        ].dropna(axis=0)
+        if dataset_name=='train':
+            prod = prod.loc[:self.train_config.valid_start-timedelta(hours=1)].dropna(axis=0)
+        elif dataset_name=='valid':
+            prod = prod.loc[
+                self.train_config.valid_start:self.train_config.test_start-timedelta(hours=1)
+            ].dropna(axis=0)
+        elif dataset_name=='test':
+            prod = prod.loc[self.train_config.test_start:].dropna(axis=0)
+        else:
+            raise Exception(f'The dataset name should be either "train", "valid" or "test", not {dataset_name}.')
         
         for i in range(self.train_config.pred_sequence_length):
             for j, col in enumerate(prod_columns):
-                self.persistence_error_matrix[i,j] = mean_absolute_error(
+                persistence_error_matrix[i,j] = mean_absolute_error(
                     prod[col].values, prod[f'{col}_shift({i+1})'].values)
         
-        self.persistence_total_mae = np.mean(np.ravel(self.persistence_error_matrix))
-    
-    '''def avg_of_history_model(self):
-        upper_percent_standard = 1.1
-        lower_percent_standard = 0.9
+        persistence_mae = np.mean(np.ravel(persistence_error_matrix))
         
-        upper_percent = upper_percent_standard
-        lower_percent = lower_percent_standard
+        return persistence_mae, persistence_error_matrix
         
-        # get wind_speeds and wind speed forecasts
-        speed = get_columns(self.wind_dataset.data_unscaled, 'speed')
-        #print(speed)
-        wind_speed_forecasts = get_columns(speed, '+')
-        if wind_speed_forecasts.empty:
-            self.avg_of_history_error_matrix = None
-        else:
-            val_wind_forecasts = wind_speed_forecasts.loc[self.train_config.valid_start:self.train_config.test_start-timedelta(hours=1)].values
-            
-            while val_wind_forecasts.ndim < 3:
-                val_wind_forecasts = val_wind_forecasts[..., np.newaxis]
-            speed = speed.drop(columns=wind_speed_forecasts.columns)
-            prod = get_columns(self.wind_dataset.data_unscaled, 'production')
-            
-            speed_prod = pd.concat([speed, prod], axis=1).dropna(axis=0)
-            speed_prod = speed_prod[speed_prod.index < self.wind_dataset.valid_start]
-            
-            preds = np.zeros_like(val_wind_forecasts)
-            
-            for i in range(preds.shape[0]):
-                for j in range(preds.shape[1]):
-                    for k in range(preds.shape[2]):
-                        wind_forecast = val_wind_forecasts[i][j][k]
-                        park = self.train_config.parks[k]
-                        
-                        similar_situation_production_avg = []
-                        while len(similar_situation_production_avg)==0:
-                            if park=='skom':
-                                similar_situation_production_avg = speed_prod[
-                                    (speed_prod[f'wind_speed_bess'] > lower_percent*wind_forecast) & (speed_prod[f'wind_speed_bess'] < upper_percent*wind_forecast)
-                                    ][f'production_skom'].values
-                            else:
-                                similar_situation_production_avg = speed_prod[
-                                    (speed_prod[f'wind_speed_{park}'] > lower_percent*wind_forecast) & (speed_prod[f'wind_speed_{park}'] < upper_percent*wind_forecast)
-                                    ][f'production_{park}'].values
-                            lower_percent -= 0.1
-                            upper_percent += 0.1
-                        
-                        lower_percent = lower_percent_standard
-                        upper_percent = upper_percent_standard
-                        preds[i, j, k] = np.mean(similar_situation_production_avg)
-            
-            self.avg_of_history_error_matrix = np.zeros((self.val_targs_unscaled.shape[1], self.val_targs_unscaled.shape[2]))
-            for i in range(self.avg_of_history_error_matrix.shape[0]):
-                for j in range(self.avg_of_history_error_matrix.shape[1]):
-                    self.avg_of_history_error_matrix[i][j] = mean_absolute_error(self.val_targs_unscaled[:,i,j], preds[:,i,j])'''
-    
-    def baseline_comparisons(self):
-        self.persistence()
+    def baseline_comparisons(self, error_matrix, persistence_error_matrix, dataset_name: str):
         self.avg_of_history_error_matrix = None
         
-        logging.info(f'Persistence MAEs:\n{self.persistence_error_matrix}')
         if self.avg_of_history_error_matrix is not None:
             logging.info(f'Average history based model MAEs:\n{self.avg_of_history_error_matrix}')
-        logging.info(f'{self.model_name} MAEs:\n{self.error_matrix}')
         
-        labels = ['1', '2', '3', '4', '5']
-        per = np.ravel(self.persistence_error_matrix)
-        if self.avg_of_history_error_matrix is not None:
-            lin = np.ravel(self.avg_of_history_error_matrix)
-        else: lin = None
-        lstm = np.ravel(self.error_matrix)
+        labels = ['+1h', '+2h', '+3h', '+4h', '+5h']
+        per = np.ravel(persistence_error_matrix)
+        '''if self.avg_of_history_error_matrix is not None:
+            lin = np.ravel(self.avg_of_history_error_matrix)'''
+        lin = None
+        lstm = np.ravel(error_matrix)
 
         x = np.arange(len(labels))  # the label locations
         width = 0.35  # the width of the bars
@@ -267,31 +274,31 @@ class Evaluate():
         # Add some text for labels, title and custom x-axis tick labels, etc.
         ax.set_ylabel('MAE')
         ax.set_xlabel('Hours ahead')
-        ax.set_title('MAE of three models')
+        ax.set_title(f'MAE comparison on the {dataset_name} set')
         ax.set_xticks(x)
         ax.set_xticklabels(labels)
         ax.legend()
         
         fig.tight_layout()
-        plt.savefig(f'{self.path}/error_comparison.png')
+        plt.savefig(f'{self.path}/{dataset_name}_error_comparison.png')
         plt.close()
     
-    def plot_fitting_example(self):
+    def plot_fitting_example(self, preds_unscaled, targs_unscaled, dataset_name: str):
         
         plt.figure()
         plt.ylabel('production (kWh/h)')
         plt.xlabel('hours')
         index = 1
-        n_samples_shown = np.minimum(50, self.val_targs_unscaled.shape[0])
+        n_samples_shown = np.minimum(50, targs_unscaled.shape[0])
         n_plots = self.train_config.pred_sequence_length*len(self.train_config.parks)
         for i in range(self.train_config.pred_sequence_length):
             for j in range(len(self.train_config.parks)):
                 plt.subplot(self.train_config.pred_sequence_length, len(self.train_config.parks), index) #(nrows, ncols, index)
-                plt.plot(np.ravel(np.array(self.val_targs_unscaled)[:n_samples_shown, i, j]), label='targets')
-                plt.plot(np.ravel(np.array(self.val_preds_unscaled)[:n_samples_shown, i, j]), label='predicitions')
+                plt.plot(np.ravel(np.array(targs_unscaled)[:n_samples_shown, i, j]), label='targets')
+                plt.plot(np.ravel(np.array(preds_unscaled)[:n_samples_shown, i, j]), label='predicitions')
                 
                 
-                plt.title(f'{i+1}h ahead at {self.park_name[self.train_config.parks[j]]}', fontsize=8)
+                plt.title(f'{i+1}h ahead at {self.park_name[self.train_config.parks[j]]}, {dataset_name} set', fontsize=8)
                 if index==n_plots:
                     plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=8)
                     plt.xticks(fontsize=8)
@@ -301,7 +308,7 @@ class Evaluate():
                 plt.tight_layout()
                 index += 1
         plt.tight_layout()
-        plt.savefig(f'{self.path}/fitting_examples.png')
+        plt.savefig(f'{self.path}/{dataset_name}_fitting_examples.png')
         plt.close()
         
     def plot_training_curve(self):

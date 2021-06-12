@@ -37,7 +37,7 @@ class App:
         self.num = NumericalDataHandler()
         
     def train(self):
-        train_model()
+        train_model(self.config)
         
     def evaluate(self):
         model_name = 'TCN'
@@ -85,12 +85,7 @@ class App:
             vid.play(self.grid_vid_name, 'grid', fps=2)
     
     def optflow(self, imgType: str, date: datetime=datetime(2019,6,3)):
-        """[summary]
-
-        Args:
-            imgType (str): [description]
-            date (datetime, optional): [description]. Defaults to datetime(2019,6,3).
-        """
+        
         self.start = date
         self.stop = date + timedelta(hours=23)
         self.interval = TimeInterval(self.start, self.stop)
@@ -104,14 +99,8 @@ class App:
     def optflow_all_days(self, imgType: str, 
                         start: datetime=datetime(2018,3,20), 
                         end: datetime=datetime(2019,3,19)):
-        """[summary]
-
-        Args:
-            imgType (str): [description]
-            start (datetime, optional): [description]. Defaults to datetime(2018,3,20).
-            end (datetime, optional): [description]. Defaults to datetime(2019,3,19).
-        """
-        for date in pd.date_range(start=datetime(2019,1,1), end=datetime(2019,3,19), freq='D'):
+        
+        for date in pd.date_range(start=start, end=end, freq='D'):
             
             self.interval = TimeInterval(date, date+timedelta(hours=23, minutes=59))
             self.timestr = self.interval.start.strftime('%Y-%m-%d-%H')
@@ -138,6 +127,9 @@ class App:
                 continue
     
     def wind_grid_structurize(self):
+        """Orders the wind speed grid images in the desired folder structure,
+        for example 'satprod/data/img/grid/2013/01/01/00;00;00.png'.
+        """
         structurize_wind_grid_images()
     
     def update_image_indices(self):
@@ -158,8 +150,9 @@ class App:
             img_extraction_method = 'lenet'
         )
         
-        dataset = WindDataset(train_config)
-        _ = dataset.update_image_indices()
+        dataset = WindDataset(data_config)
+        if not dataset.image_indices_recently_updated:
+            dataset.update_image_indices()
     
 
 def main():

@@ -180,7 +180,7 @@ class NumericalDataHandler():
                 wind_df_park
             ], axis=1).dropna(axis=0)
             
-            X = X.loc[:self.valid_start_date]
+            X = X.loc[:self.valid_start_date-timedelta(hours=1)]
             
             feature = X[f'wind_speed_{park_name}'].values.reshape(-1, 1)
             target = X[f'production_{park}'].values

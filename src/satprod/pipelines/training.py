@@ -17,139 +17,51 @@ from satprod.pipelines.dataset import WindDataset
 from satprod.ml.lstm import LSTM
 from satprod.ml.agru import AGRU
 from satprod.ml.tcn import TCN
+from satprod.ml.tcn_bai import TCN_Bai
+from satprod.ml.mlr import MLR
 
 from satprod.data_handlers.data_utils import get_columns
-from satprod.configs.job_configs import TrainConfig
+from satprod.configs.job_configs import TrainConfig, DataConfig
 from satprod.pipelines.evaluation import Results, Evaluate, store_results
 
 from tasklog.tasklogger import logging
 from tqdm import tqdm
 
-def train_model():
+def train_model(config):
+    """Builds a dataset and a model that fit each other,
+    trains the model on the train data,
+    saves the trained model with the lowest error on the validation data,
+    and runs this model on the test set. The model, configs, and predictions
+    on each split of the set is stored in the 'storage/' folder,
+    tagged with the name of the park, model name, and the point in time
+    when the model was stored.
+
+    Args:
+        config (munch.Munch): the contents of 'config.yaml', located in the project root directory.
+    """
     
-    parks = ['skom']#, ['bess', 'vals','skom','yvik']
-    num_feature_types = ['production', 'speed', 'direction'] #['direction', 'speed', 'production']
-    use_numerical_forecasts = True
-    use_img_forecasts = True
-    img_features = ['grid']#['grid'] # [] or ['grid']
-    img_extraction_method = 'resnet' # lenet, deepsense, resnet
-    train_on_small_subset = False
-    
-    model = 'LSTM' #'LSTM' # 'TCN', 'AGRU'
-    
-    lenet_channels = [1, 16, 32]
-    if len(img_features)==0:
-        img_extraction_method = None
-        lenet_channels[-1] = 0
-    if img_extraction_method is None:
-        img_features = []
-        lenet_channels[-1] = 0
-        
-    assert len(set(parks))==len(parks), 'The list of parks contains duplicates'
-    
-    train_config = TrainConfig(
-        model = model,
-        batch_size = 64,
-        num_epochs = 30,
-        learning_rate = 4e-3,
-        scheduler_gamma = 0.9,
-        pred_sequence_length = 5,
-        random_seed = 0,
-        parks = parks,
-        num_feature_types = num_feature_types,
-        img_features = img_features,
-        img_extraction_method = img_extraction_method,
-        train_on_small_subset = train_on_small_subset,
-        use_numerical_forecasts = use_numerical_forecasts,
-        use_img_forecasts = use_img_forecasts
-    )
-    
-    # get data
-    wind_dataset = WindDataset(train_config)
-    
-    # define image extraction parameters
-    lenet_params = {
-        'channels' : lenet_channels,
-        'kernel_size_conv' : [8,4],
-        'stride_conv' : [4,4],
-        'padding_conv' : [0,0],
-        'kernel_size_pool' : [3,2],
-        'stride_pool' : [3,1],
-        'padding_pool' : [0,0],
-        'height' : wind_dataset.img_height,
-        'width' : wind_dataset.img_width
-    }
-    
-    resnet_params = {
-        'output_size' : 8
-    }
-    
-    deepsense_params = {
-        
-    }
-    
-    # define model structure
-    lstm_params = {
-        'sequence_length' : 12,
-        'hidden_size' : 32,
-        'linear_size' : 64,
-        'num_layers' : 1,
-        'input_size' : wind_dataset.n_past_features,
-        'num_forecast_features' : wind_dataset.n_forecast_features,
-        'num_output_features' : wind_dataset.n_output_features,
-        'output_size' : train_config.pred_sequence_length,
-        'initialization' : 'xavier',
-        'activation' : nn.Tanh(),
-        'img_extraction_method': train_config.img_extraction_method,
-        'lenet_params' : lenet_params,
-        'resnet_params' : resnet_params,
-        'deepsense_params' : deepsense_params
-    }
-    
-    tcn_params = {
-        'channels' : [1, 8, 8, 1],
-        'num_past_features': wind_dataset.n_past_features,
-        'num_unique_forecast_features': wind_dataset.n_unique_forecast_features,
-        'output_size': wind_dataset.n_output_features,
-        'pred_sequence_length': train_config.pred_sequence_length,
-        'kernel_size' : 3,
-        'dilations' : [1, 2, 4],
-        'img_extraction_method': train_config.img_extraction_method,
-        'lenet_params' : lenet_params,
-        'resnet_params' : resnet_params,
-        'deepsense_params' : deepsense_params
-    }
-    
-    if model=='TCN':
-        net = TCN(**tcn_params)
-    elif model=='LSTM':
-        net = LSTM(**lstm_params)
-    else:
-        exit()
+    # initialize dataset and model based on the configuration dict
+    net, train_config, data_config, dataset = init_data_and_model(config)
     
     # train the model and return the model with the lowest validation error
-    best_model, results = train_loop(net, train_config, wind_dataset)
+    best_model, results = train_loop(net, train_config, data_config, dataset)
     
-    now = datetime.now().strftime('%Y-%m-%d-%H-%M')
-    
+    # store results tagged with the current time and the model type
     store_results(
-        timestamp=now,
-        model=best_model,
+        model=best_model.cpu(),
         train_config=train_config,
+        data_config=data_config,
         results=results,
-        scaler=wind_dataset.scaler,
-        target_label_indices=wind_dataset.target_label_indices
+        scaler=dataset.scaler,
+        target_label_indices=dataset.target_label_indices
     )
-    
-    if len(train_config.parks)==1: park = train_config.parks[0]
-    else: park = 'all'
-    
-    evaluate = Evaluate(timestamp=now, model_name=best_model.name, park=park)
-    evaluate.plot_errors()
 
-def train_loop(net, train_config: TrainConfig, data: WindDataset):
+def train_loop(net, train_config: TrainConfig, data_config: DataConfig, data: WindDataset):
     sequence_length = net.sequence_length
-    pred_sequence_length = train_config.pred_sequence_length
+    logging.info(f'Model: {net.name}')
+    logging.info(f'Sequence length: {sequence_length}')
+    
+    pred_sequence_length = data_config.pred_sequence_length
     batch_size = train_config.batch_size
     num_epochs = train_config.num_epochs
     
@@ -166,7 +78,7 @@ def train_loop(net, train_config: TrainConfig, data: WindDataset):
             trainable_params_in_network += len(np.ravel(param.data.cpu().numpy()))
             #print(name, param.data.numpy().shape)
         params_in_network += len(np.ravel(param.data.cpu().numpy()))
-        
+    
     logging.info(f'Trainable parameters in network: {trainable_params_in_network}.')
     logging.info(f'Parameters in network: {params_in_network}.')
     
@@ -176,6 +88,7 @@ def train_loop(net, train_config: TrainConfig, data: WindDataset):
     # get train and valid indices
     train_indices = np.arange(sequence_length, data.valid_start_index - pred_sequence_length)
     valid_indices = np.arange(data.valid_start_index + sequence_length, data.test_start_index - pred_sequence_length)
+    test_indices = np.arange(data.test_start_index + sequence_length, len(data) - pred_sequence_length)
     
     # set seed for shuffling train indices
     np.random.seed(train_config.random_seed)
@@ -191,30 +104,43 @@ def train_loop(net, train_config: TrainConfig, data: WindDataset):
         best_val_preds = [],
         val_targs = [],
         corr_train_preds = [],
-        train_targs = []
+        train_targs = [],
+        test_preds = [],
+        test_targs = [],
+        test_mae = np.inf
     )
     
     num_samples_train = len(train_indices)
     num_batches_train = num_samples_train // batch_size
     num_samples_valid = len(valid_indices)
     num_batches_valid = num_samples_valid // batch_size
+    num_samples_test = len(test_indices)
+    num_batches_test = num_samples_test // batch_size
     
-    if train_config.train_on_small_subset:
-        num_batches_train = 2
+    if train_config.train_on_one_batch:
+        num_batches_train = 1
         train_indices = train_indices[:(num_batches_train+1)*batch_size]
         num_samples_train = len(train_indices)
-        num_batches_valid = 2
+        num_batches_valid = 1
         valid_indices = valid_indices[:(num_batches_valid+1)*batch_size]
         num_samples_valid = len(valid_indices)
+        num_batches_test = 1
+        test_indices = test_indices[:(num_batches_test+1)*batch_size]
+        num_samples_test = len(test_indices)
     
-    logging.info(f'Number of train and valid samples: {num_samples_train}, {num_samples_valid}')
-    logging.info(f'Number of train and valid batches: {num_batches_train}, {num_batches_valid}')
+    logging.info(f'Number of train, valid and test samples: {num_samples_train}, {num_samples_valid}, {num_samples_test}')
+    logging.info(f'Number of train, valid and test batches: {num_batches_train}, {num_batches_valid}, {num_batches_test}')
     
     scheduler = StepLR(
         optimizer,
         step_size=train_config.scheduler_step_size, 
         gamma=train_config.scheduler_gamma
     )
+    
+    # temporary storage path
+    now = datetime.now()
+    path = f'storage'
+    os.makedirs(path, exist_ok=True)
     
     for epoch in range(num_epochs):
         # shuffle
@@ -227,26 +153,29 @@ def train_loop(net, train_config: TrainConfig, data: WindDataset):
             
             optimizer.zero_grad()
             
-            X_batch, X_batch_forecasts, X_batch_img, X_last_production, X_batch_img_forecasts, y_batch = get_sequenced_data(
+            data_dict = get_sequenced_data(
                 batch_indices = train_batch_indices, 
                 sequence_length = sequence_length, 
                 train_config = train_config, 
+                data_config = data_config,
                 data = data,
                 device = device
             )
-            if X_batch is None: continue
-            current_batch_size = X_batch.shape[0]
             
-            if train_config.recursive:
-                # train only on one step ahead
-                output = net(X_batch, X_batch_forecasts, X_batch_img, X_last_production, X_batch_img_forecasts, y_batch)
+            if data_dict['X_prod'] is None and data_dict['X_img'] is None: continue
+            if data_config.use_img_features > 0:
+                current_batch_size = data_dict['X_img'].shape[0]
             else:
-                if train_config.model=='LSTM':
-                    output = net(X_batch, X_batch_forecasts, X_batch_img)
-                
+                current_batch_size = data_dict['X_prod'].shape[0]
+            
+            output = net(data_dict)
             
             # compute gradients given loss
-            batch_loss = criterion(output, y_batch)
+            if data_config.model=='TCN_Bai' or data_config.model=='TCN':
+                y = torch.cat([data_dict['X_prod'][:, pred_sequence_length:, :], data_dict['y_prod']], dim=1)
+                batch_loss = criterion(output, y)
+            else:
+                batch_loss = criterion(output, data_dict['y_prod'])
             
             batch_loss.backward()
             optimizer.step()
@@ -257,22 +186,27 @@ def train_loop(net, train_config: TrainConfig, data: WindDataset):
         for i in tqdm(range(num_batches_train+1), desc="Train evaluation"):
             train_batch_indices = np.sort(train_indices)[i*batch_size:(i+1)*batch_size]
             
-            X_batch, X_batch_forecasts, X_batch_img, X_last_production, X_batch_img_forecasts, y_batch = get_sequenced_data(
+            data_dict = get_sequenced_data(
                 batch_indices = train_batch_indices, 
                 sequence_length = sequence_length, 
                 train_config = train_config, 
+                data_config = data_config,
                 data = data,
                 device = device
             )
-            if X_batch is None: continue
-            current_batch_size = X_batch.shape[0]
             
-            if train_config.model=='LSTM':
-                output = net(X_batch, X_batch_forecasts, X_batch_img)
+            if data_dict['X_prod'] is None and data_dict['X_img'] is None: continue
+            if data_config.use_img_features:
+                current_batch_size = data_dict['X_img'].shape[0]
             else:
-                output = net(X_batch, X_batch_forecasts, X_batch_img, X_last_production, X_batch_img_forecasts)
+                current_batch_size = data_dict['X_prod'].shape[0]
             
-            train_targs += list(y_batch.data.cpu().numpy())
+            output = net(data_dict)
+            
+            if data_config.model=='TCN_Bai' or data_config.model=='TCN':
+                output = output[:, -pred_sequence_length:, :]
+            
+            train_targs += list(data_dict['y_prod'].data.cpu().numpy())
             train_preds += list(output.data.cpu().numpy())
         
         ## Evaluate validation
@@ -280,23 +214,27 @@ def train_loop(net, train_config: TrainConfig, data: WindDataset):
         for i in tqdm(range(num_batches_valid+1), desc="Valid evaluation"):
             valid_batch_indices = valid_indices[i*batch_size:(i+1)*batch_size]
             
-            X_batch, X_batch_forecasts, X_batch_img, X_last_production, X_batch_img_forecasts, y_batch = get_sequenced_data(
+            data_dict = get_sequenced_data(
                 batch_indices = valid_batch_indices, 
                 sequence_length = sequence_length, 
                 train_config = train_config, 
+                data_config = data_config,
                 data = data,
                 device = device
             )
             
-            if X_batch is None: continue
-            current_batch_size = X_batch.shape[0]
-            
-            if train_config.model=='LSTM':
-                output = net(X_batch, X_batch_forecasts, X_batch_img)
+            if data_dict['X_prod'] is None and data_dict['X_img'] is None: continue
+            if data_config.use_img_features:
+                current_batch_size = data_dict['X_img'].shape[0]
             else:
-                output = net(X_batch, X_batch_forecasts, X_batch_img, X_last_production, X_batch_img_forecasts)
+                current_batch_size = data_dict['X_prod'].shape[0]
             
-            val_targs += list(y_batch.data.cpu().numpy())
+            output = net(data_dict)
+            
+            if data_config.model=='TCN_Bai' or data_config.model=='TCN':
+                output = output[:, -pred_sequence_length:, :]
+            
+            val_targs += list(data_dict['y_prod'].data.cpu().numpy())
             val_preds += list(output.data.cpu().numpy())
         
         train_mae_cur = mean_absolute_error(np.ravel(train_targs), np.ravel(train_preds))
@@ -316,7 +254,8 @@ def train_loop(net, train_config: TrainConfig, data: WindDataset):
             results.train_targs = train_targs
             
             # save the model with the lowest valid error to file
-            with open(f'best_model.pickle', 'wb') as model_file:
+            
+            with open(f'{path}/best_model_{now}.pickle', 'wb') as model_file:
                 pickle.dump(net, model_file)
         
         scheduler.step()
@@ -326,105 +265,290 @@ def train_loop(net, train_config: TrainConfig, data: WindDataset):
         
         logging.info('Epoch %2i : Train MAE %f, Valid MAE %f' % (epoch+1, train_mae_cur, valid_mae_cur))
     
-    with open(f'best_model.pickle', 'rb') as model_file:
+    with open(f'{path}/best_model_{now}.pickle', 'rb') as model_file:
         best_model = pickle.load(model_file)
     
-    os.remove(f'best_model.pickle')
+    os.remove(f'{path}/best_model_{now}.pickle')
+    
+    ## Evaluate test
+    test_preds, test_targs = [], []
+    for i in tqdm(range(num_batches_test+1), desc="Test evaluation"):
+        test_batch_indices = test_indices[i*batch_size:(i+1)*batch_size]
+        
+        data_dict = get_sequenced_data(
+            batch_indices = test_batch_indices, 
+            sequence_length = sequence_length, 
+            train_config = train_config, 
+            data_config = data_config,
+            data = data,
+            device = device
+        )
+        
+        if data_dict['X_prod'] is None and data_dict['X_img'] is None: continue
+        if data_config.use_img_features:
+            current_batch_size = data_dict['X_img'].shape[0]
+        else:
+            current_batch_size = data_dict['X_prod'].shape[0]
+        
+        output = best_model(data_dict)
+        
+        if data_config.model=='TCN_Bai' or 'TCN':
+            output = output[:, -pred_sequence_length:, :]
+        
+        test_targs += list(data_dict['y_prod'].data.cpu().numpy())
+        test_preds += list(output.data.cpu().numpy())
+    
+    test_mae = mean_absolute_error(np.ravel(test_targs), np.ravel(test_preds))
+    results.test_mae = test_mae
+    results.test_preds = test_preds
+    results.test_targs = test_targs
+    
     return best_model, results
-
-def get_sequenced_data(batch_indices: [int], sequence_length: int, train_config: TrainConfig, data: WindDataset, device):
-    input_data_array = []
-    target_data_array = []
-    forecast_data_array = []
-    img_data_array = []
-    img_forecast_data_array = []
-    last_production_data_array = []
+    
+def get_sequenced_data(
+    batch_indices: [int], 
+    sequence_length: int,
+    train_config: TrainConfig, 
+    data_config: DataConfig, 
+    data: WindDataset, 
+    device):
+    
+    data_dict = {
+        'X_prod': None, 
+        'X_weather': None, 
+        'X_weather_forecasts': None, 
+        'X_img': None, 
+        'X_img_forecasts': None, 
+        'y_prod': None
+    }
+    
+    # production
+    input_prod_array = []
+    target_prod_array = []
+    
+    # weather
+    input_weather_array = []
+    forecast_weather_array = []
+    
+    # images
+    input_img_array = []
+    forecast_img_array = []
     
     for j in batch_indices:
         input_data = data[j-sequence_length:j].copy()
-        target_data = data[j:j+train_config.pred_sequence_length][data.target_labels].copy()
+        target_data = data[j:j+data_config.pred_sequence_length][data.target_labels].copy()
 
+        # the input and target data must not contain missing values
         if len(input_data.dropna(axis=0)) < sequence_length: continue
-        if len(target_data.dropna(axis=0)) < train_config.pred_sequence_length: continue
+        if len(target_data.dropna(axis=0)) < data_config.pred_sequence_length: continue
         
-        if len(train_config.img_features) > 0:
-            img_data = input_data[train_config.img_features].copy()
-            input_data = input_data.drop(columns=train_config.img_features)
+        # image features
+        if data_config.use_img_features > 0:
+            img_data = input_data[data_config.img_features].copy()
+            input_data = input_data.drop(columns=data_config.img_features)
             
             img_data = img_data.astype(int)
             
             image_sequence = []
-            img_indices = np.ravel(img_data[train_config.img_features].values)
+            img_indices = np.ravel(img_data[data_config.img_features].values)
             for index in img_indices:
-                image_sequence.append(data.img_datasets[train_config.img_features[0]][index].img)
+                image_sequence.append(data.img_datasets[data_config.img_features[0]][index].img)
                 
             img_data = torch.from_numpy(np.array(image_sequence))
-            img_data_array.append(img_data)
             
-            if train_config.use_img_forecasts:
-                img_forecast_data = get_columns(input_data, train_config.img_features[0]).astype(int)
+            # add to array
+            input_img_array.append(img_data)
+            
+            # image forecast features
+            if data_config.use_img_forecasts:
+                img_forecast_data = get_columns(input_data, data_config.img_features[0]).astype(int)
                 input_data = input_data.drop(columns=img_forecast_data.columns)
                 
                 image_sequence = []
-                img_indices = np.ravel(img_forecast_data.iloc[-1].values[:train_config.pred_sequence_length-1])
+                img_indices = np.ravel(img_forecast_data.iloc[-1].values[:data_config.pred_sequence_length])
                 
                 for index in img_indices:
-                    image_sequence.append(data.img_datasets[train_config.img_features[0]][index].img)
+                    image_sequence.append(data.img_datasets[data_config.img_features[0]][index].img)
                 
                 img_forecast_data = torch.from_numpy(np.array(image_sequence))
-                img_forecast_data_array.append(img_forecast_data)
+                
+                # add to array
+                forecast_img_array.append(img_forecast_data)
         
-        #print(get_columns(input_data, f'+{1}h').iloc[-1])
-        if train_config.use_numerical_forecasts:
+        # weather forecasts
+        if data_config.use_numerical_forecasts:
             forecast_data = []
-            for i in range(train_config.pred_sequence_length):
+            for i in range(data_config.pred_sequence_length):
                 forecast_data.append(get_columns(input_data, f'+{i+1}h').iloc[-1].values)
             
             input_data = input_data.drop(columns=get_columns(input_data, '+').columns)
             forecast_data = torch.from_numpy(np.array(forecast_data))
-            forecast_data_array.append(forecast_data)
-        #print(input_data)
-        #print(forecast_data)
-        last_production_data = torch.from_numpy(get_columns(input_data, 'production').iloc[-1].values)
+            
+            # add to array
+            forecast_weather_array.append(forecast_data)
+        
+        input_prod = torch.from_numpy(get_columns(input_data, 'production').values)
+        input_data = input_data.drop(columns=get_columns(input_data, 'production').columns)
+        
         input_data = torch.from_numpy(input_data.values)
         target_data = torch.from_numpy(target_data.values)
-        #print(input_data)
-        last_production_data_array.append(last_production_data)
-        input_data_array.append(input_data)
-        target_data_array.append(target_data)
-        #exit()
+        
+        # add to array
+        input_weather_array.append(input_data)
+        input_prod_array.append(input_prod)
+        target_prod_array.append(target_data)
     
-    if len(input_data_array)==0:
-        return None, None, None, None, None, None
-    if len(target_data_array)==0:
-        return None, None, None, None, None, None
+    # if there are missing values in all the sequences in the batch, return data_dict of None
+    if len(input_prod_array)==0 or len(target_prod_array)==0: return data_dict
     
-    X_batch = torch.stack(input_data_array)
-    y_batch = torch.stack(target_data_array)
-    X_last_production = torch.stack(last_production_data_array)
+    X_prod = torch.stack(input_prod_array)
+    X_weather = torch.stack(input_weather_array)
+    y_prod = torch.stack(target_prod_array)
+    
+    data_dict['X_prod'] = Variable(X_prod).float().to(device)
+    data_dict['X_weather'] = Variable(X_weather).float().to(device)
+    data_dict['y_prod'] = Variable(y_prod).float().to(device)
     
     if data.n_image_features > 0:
-        X_batch_img = torch.stack(img_data_array)
-        X_batch_img = Variable(X_batch_img).float().to(device)
-        if train_config.use_img_forecasts:
-            X_batch_img_forecasts = torch.stack(img_forecast_data_array)
-            X_batch_img_forecasts = Variable(X_batch_img_forecasts).float().to(device)
-        else:
-            X_batch_img_forecasts = None
-    else:
-        X_batch_img = None
-        X_batch_img_forecasts = None
-    if len(forecast_data_array) > 0:
-        X_batch_forecasts = torch.stack(forecast_data_array)
-        X_batch_forecasts = Variable(X_batch_forecasts).float().to(device)
-    else:
-        X_batch_forecasts = None
-        
-    X_batch = Variable(X_batch).float().to(device)
-    y_batch = Variable(y_batch).float().to(device)
-    X_last_production = Variable(X_last_production).float().to(device)
+        X_img = torch.stack(input_img_array)
+        data_dict['X_img'] = Variable(X_img).float().to(device)
+        if data_config.use_img_forecasts:
+            X_img_forecasts = torch.stack(forecast_img_array)
+            data_dict['X_img_forecasts'] = Variable(X_img_forecasts).float().to(device)
     
-    return X_batch, X_batch_forecasts, X_batch_img, X_last_production, X_batch_img_forecasts, y_batch
+    if len(forecast_weather_array) > 0:
+        X_weather_forecasts = torch.stack(forecast_weather_array)
+        data_dict['X_weather_forecasts'] = Variable(X_weather_forecasts).float().to(device)
+    
+    return data_dict
+
+def init_data_and_model(config):
+    """Uses the input config to initialize config objects, the dataset and the model.
+
+    Args:
+        config (munch.Munch): [description]
+
+    Raises:
+        Exception: checks that the model name fits any of the available models
+
+    Returns:
+        net
+        train_config
+        data_config
+        wind_dataset
+    """
+    train_config = TrainConfig(
+        batch_size = config.train_config.batch_size,
+        num_epochs = config.train_config.num_epochs,
+        learning_rate = config.train_config.learning_rate,
+        scheduler_gamma = config.train_config.scheduler_gamma,
+        random_seed = config.train_config.random_seed,
+        train_on_one_batch = config.train_on_one_batch
+    )
+    
+    logging.info(vars(train_config))
+    
+    data_config = DataConfig(
+        model = config.model, 
+        parks = config.data_config.parks,
+        numerical_features = config.data_config.numerical_features, 
+        use_img_features = config.data_config.use_img_features, 
+        img_extraction_method = config.data_config.img_extraction_method,
+        pred_sequence_length = config.data_config.pred_sequence_length,
+        use_numerical_forecasts = config.data_config.use_numerical_forecasts,
+        use_img_forecasts = config.data_config.use_img_forecasts,
+        valid_start = config.data_config.valid_start,
+        test_start = config.data_config.test_start,
+        test_end = config.data_config.test_end
+    )
+    
+    logging.info(vars(data_config))
+    
+    # get data
+    wind_dataset = WindDataset(data_config)
+    
+    # define image extraction parameters
+    lenet_params = {
+        'channels' : config.img_extraction_methods.lenet.channels,
+        'kernel_size_conv' : config.img_extraction_methods.lenet.kernel_size_conv,
+        'stride_conv' : config.img_extraction_methods.lenet.stride_conv,
+        'padding_conv' : config.img_extraction_methods.lenet.padding_conv,
+        'kernel_size_pool' : config.img_extraction_methods.lenet.kernel_size_pool,
+        'stride_pool' : config.img_extraction_methods.lenet.stride_pool,
+        'padding_pool' : config.img_extraction_methods.lenet.padding_pool,
+        'height' : wind_dataset.img_height,
+        'width' : wind_dataset.img_width
+    }
+    
+    resnet_params = {
+        'output_size' : config.img_extraction_methods.resnet.output_size
+    }
+    
+    deepsense_params = {
+        
+    }
+    
+    # define model structure
+    lstm_params = {
+        'sequence_length' : config.models.lstm.sequence_length,
+        'hidden_size' : config.models.lstm.hidden_size,
+        'linear_size' : config.models.lstm.linear_size,
+        'num_layers' : config.models.lstm.num_layers,
+        'input_size' : wind_dataset.n_past_features,
+        'num_forecast_features' : wind_dataset.n_forecast_features,
+        'num_output_features' : wind_dataset.n_output_features,
+        'output_size' : data_config.pred_sequence_length,
+        'img_extraction_method': data_config.img_extraction_method,
+        'lenet_params' : lenet_params,
+        'resnet_params' : resnet_params,
+        'deepsense_params' : deepsense_params,
+        'dropout': config.models.lstm.dropout
+    }
+    
+    tcn_params = {
+        'num_past_features': wind_dataset.n_past_features,
+        'num_forecast_features': wind_dataset.n_forecast_features,
+        'output_size': wind_dataset.n_output_features,
+        'channels': config.models.tcn.channels,
+        'kernel_size': config.models.tcn.kernel_size,
+        'dilation_base': config.models.tcn.dilation_base,
+        'pred_sequence_length': data_config.pred_sequence_length,
+        'img_extraction_method': data_config.img_extraction_method,
+        'lenet_params' : lenet_params,
+        'resnet_params' : resnet_params,
+        'deepsense_params' : deepsense_params,
+        'dropout': config.models.tcn.dropout
+    }
+    
+    tcn_bai_params = {
+        'input_size': wind_dataset.n_past_features, 
+        'output_size': wind_dataset.n_output_features,
+        'channels': config.models.tcn_bai.channels, 
+        'kernel_size': config.models.tcn_bai.kernel_size, 
+        'dropout': config.models.tcn_bai.dropout,
+        'pred_sequence_length': data_config.pred_sequence_length
+    }
+    
+    mlr_params = {
+        'num_past_features': wind_dataset.n_past_features, 
+        'output_size': wind_dataset.n_output_features,
+        'sequence_length': config.models.mlr.sequence_length,
+        'num_forecast_features': wind_dataset.n_forecast_features, 
+        'pred_sequence_length': data_config.pred_sequence_length
+    }
+    
+    if config.model=='TCN':
+        net = TCN(**tcn_params)
+    elif config.model=='LSTM':
+        net = LSTM(**lstm_params)
+    elif config.model=='TCN_Bai':
+        net = TCN_Bai(**tcn_bai_params)
+    elif config.model=='MLR':
+        net = MLR(**mlr_params)
+    else:
+        raise Exception(f'The model "{config.model}" does not exist.')
+    
+    return net, train_config, data_config, wind_dataset
 
 def temporary_plot(results: Results, val_targs, val_preds):
     plt.figure(figsize=(16,7))

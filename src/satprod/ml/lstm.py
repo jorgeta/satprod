@@ -13,12 +13,8 @@ class LSTM(nn.Module):
                 num_output_features: int, 
                 num_layers: int, 
                 sequence_length: int,
-                height: int = 100, 
-                width: int = 100,
                 linear_size: int=0,
                 dropout: float=0.0,
-                initialization: str=None, 
-                activation=None,
                 img_extraction_method: str=None,
                 lenet_params: dict=None, 
                 resnet_params: dict=None,
@@ -66,10 +62,9 @@ class LSTM(nn.Module):
                 self.hidden_size+self.num_forecast_features, 
                 self.output_size*self.num_output_features)
         
-        if initialization=='xavier':
-            self.init_parameters()
+        self.init_parameters()
         
-        self.activation = activation
+        self.tanh = nn.Tanh()
         
     def init_parameters(self):
         for param in self.lstm.parameters():
@@ -87,22 +82,26 @@ class LSTM(nn.Module):
         else:
             nn.init.xavier_normal_(self.linear.weight)
             nn.init.zeros_(self.linear.bias)
-            
-    '''def init_hidden_state(self, batch_size: int):
-        self.hidden = (
-            torch.zeros(1, batch_size, self.hidden_size),
-            torch.zeros(1, batch_size, self.hidden_size)
-        )'''
     
-    def forward(self, x, x_forecasts, x_img):
+    def forward(self, data_dict: dict):
         
-        # x shape: (batch_size, sequence_length, num_past_features)
-        # x_forecasts shape: (batch_size, num_forecast_features)
+        x_prod = data_dict['X_prod']
+        # x shape: (batch_size, sequence_length, num_output_features)
+        
+        x_weather = data_dict['X_weather']
+        # x_weather shape: (batch_size, sequence_length, num_forecast_features)
+        
+        x_weather_forecasts = data_dict['X_weather_forecasts']
+        # x_weather_forecasts shape: (batch_size, pred_sequence_length, num_forecast_features)
+        
+        x_img = data_dict['X_img']
         # x_img shape: (batch_size, sequence_length, img_height, img_width)
             # or (batch_size, sequence_length, img_height, img_width, bands)
         
+        # the lstm doesn't differ the past prod and weather features
+        x = torch.cat([x_weather, x_prod], dim=2)
+        
         self.batch_size = x.shape[0]
-        #self.init_hidden_state(self.batch_size)
         
         if x_img is not None:
             x_img = image_feature_extraction(x_img, self)
@@ -113,11 +112,11 @@ class LSTM(nn.Module):
 
         x = x[:, -1, :]
         # x.shape: (batch_size, hidden_size)
-        if x_forecasts is not None:
-            x = torch.cat([x, x_forecasts.view(self.batch_size, -1)], dim=1)
+        if x_weather_forecasts is not None:
+            x = torch.cat([x, x_weather_forecasts.view(self.batch_size, -1)], dim=1)
         
         if self.linear_size > 0:
-            x = self.activation(self.linear1(x))
+            x = self.tanh(self.linear1(x))
             # x.shape: (batch_size, linear_size)
         
             x = self.linear2(self.dropout(x))
