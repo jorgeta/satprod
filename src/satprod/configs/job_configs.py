@@ -55,3 +55,6 @@ class DataConfig():
         else:
             self.use_img_forecasts = False
             
+        if not self.use_img_features: 
+            self.img_extraction_method = None
+            

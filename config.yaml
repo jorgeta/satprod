@@ -6,12 +6,12 @@ train_on_one_batch: True
 data_config:
   parks: ['skom'] # ['bess', 'vals','skom','yvik']
   numerical_features: ['production', 'speed', 'direction']
-  use_img_features: True
+  use_img_features: False
   img_extraction_method: 'lenet' # 'lenet', 'deepsense', 'resnet'
   
   pred_sequence_length: 5
   use_numerical_forecasts: True
-  use_img_forecasts: True
+  use_img_forecasts: False
   
   valid_start: {'year': 2019, 'month': 5, 'day': 12, 'hour': 0}
   test_start: {'year': 2020, 'month': 5, 'day': 12, 'hour': 0}
