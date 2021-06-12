@@ -1,7 +1,7 @@
 app: satprod
 
 model: 'LSTM' #'LSTM', 'TCN', 'AGRU', 'TCN_Bai', 'MLR'
-train_on_one_batch: True
+train_on_one_batch: False
 
 data_config:
   parks: ['skom'] # ['bess', 'vals','skom','yvik']
@@ -19,7 +19,7 @@ data_config:
 
 train_config:
   batch_size: 64
-  num_epochs: 1
+  num_epochs: 50
   learning_rate: 4.0e-3
   scheduler_gamma: 0.9
   random_seed: 0
@@ -42,16 +42,16 @@ models:
     hidden_size: 32
     linear_size: 64
     num_layers: 1
-    dropout: 0.0
+    dropout: 0.2
   tcn:
     channels: [32, 32, 32]
     kernel_size: 3
     dilation_base: 2
-    dropout: 0.0
+    dropout: 0.2
   tcn_bai:
     channels: [32, 32, 32]
     kernel_size: 3
     dropout: 0.0
   mlr:
-    sequence_length: 1
+    sequence_length: 3
 

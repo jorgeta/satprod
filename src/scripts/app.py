@@ -40,8 +40,8 @@ class App:
         train_model(self.config)
         
     def evaluate(self):
-        model_name = 'TCN'
-        timestamp = '2021-06-05-15-39'
+        model_name = 'LSTM'
+        timestamp = '2021-06-12-23-22'
         park = 'skom'
         evaluate = Evaluate(timestamp=timestamp, model_name=model_name, park=park)
     

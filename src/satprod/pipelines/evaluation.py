@@ -56,12 +56,7 @@ def store_results(
 
 class Evaluate():
     
-    def __init__(self, timestamp: str, model_name: str, park: str,
-                save_info_file: bool=True,
-                run_persistence: bool=True,
-                save_error_plots: bool=True,
-                save_fitting_examples: bool=True
-                ):
+    def __init__(self, timestamp: str, model_name: str, park: str):
         cd = str(os.path.dirname(os.path.abspath(__file__)))
         self.root = f'{cd}/../../..'
         self.timestamp = timestamp
@@ -98,31 +93,27 @@ class Evaluate():
         
         logging.info(f'{self.model_name} Valid MAEs:\n{self.valid_error_matrix}')
         
-        if save_error_plots:
-            self.plot_errors(self.train_error_matrix, 'train', self.train_mae)
-            self.plot_errors(self.valid_error_matrix, 'valid', self.valid_mae)
-            self.plot_errors(self.test_error_matrix, 'test', self.test_mae)
+        self.plot_errors(self.train_error_matrix, 'train', self.train_mae)
+        self.plot_errors(self.valid_error_matrix, 'valid', self.valid_mae)
+        self.plot_errors(self.test_error_matrix, 'test', self.test_mae)
         
-        if run_persistence:
-            self.persistence_train_mae, self.persistence_train_error_matrix = self.persistence('train')
-            self.persistence_valid_mae, self.persistence_valid_error_matrix = self.persistence('valid')
-            self.persistence_test_mae, self.persistence_test_error_matrix = self.persistence('test')
-            
-            logging.info(f'Persistence Valid MAEs:\n{self.persistence_valid_error_matrix}')
-            
-            self.baseline_comparisons(self.train_error_matrix, self.persistence_train_error_matrix, 'train')
-            self.baseline_comparisons(self.valid_error_matrix, self.persistence_valid_error_matrix, 'valid')
-            self.baseline_comparisons(self.test_error_matrix, self.persistence_test_error_matrix, 'test')
+        self.persistence_train_mae, self.persistence_train_error_matrix = self.persistence('train')
+        self.persistence_valid_mae, self.persistence_valid_error_matrix = self.persistence('valid')
+        self.persistence_test_mae, self.persistence_test_error_matrix = self.persistence('test')
         
-        if save_fitting_examples:
-            self.plot_fitting_example(self.train_preds_unscaled, self.train_targs_unscaled, 'train')
-            self.plot_fitting_example(self.valid_preds_unscaled, self.valid_targs_unscaled, 'valid')
-            self.plot_fitting_example(self.test_preds_unscaled, self.test_targs_unscaled, 'test')
+        logging.info(f'Persistence Valid MAEs:\n{self.persistence_valid_error_matrix}')
+        
+        self.baseline_comparisons(self.train_error_matrix, self.persistence_train_error_matrix, 'train')
+        self.baseline_comparisons(self.valid_error_matrix, self.persistence_valid_error_matrix, 'valid')
+        self.baseline_comparisons(self.test_error_matrix, self.persistence_test_error_matrix, 'test')
+
+        self.plot_fitting_example(self.train_preds_unscaled, self.train_targs_unscaled, 'train')
+        self.plot_fitting_example(self.valid_preds_unscaled, self.valid_targs_unscaled, 'valid')
+        self.plot_fitting_example(self.test_preds_unscaled, self.test_targs_unscaled, 'test')
         
         self.plot_training_curve()
         
-        if save_info_file:
-            self.info()
+        self.info()
     
     def get_stored_results(self):
         self.path = f'{self.root}/storage/{self.park}/{self.model_name}/{self.timestamp}'
@@ -132,9 +123,10 @@ class Evaluate():
         self.net = net
         self.results = results
         self.train_config = train_config
+        self.data_config = data_config
         self.scaler = scaler
         self.target_label_indices = target_label_indices
-        self.wind_dataset = WindDataset(self.train_config)
+        self.wind_dataset = WindDataset(self.data_config)
     
     def info(self, to_console: bool=False):
         info_str = f'\nTimestamp: {self.timestamp}\nPark: {self.park}\nModel: {self.model_name}'
@@ -173,7 +165,7 @@ class Evaluate():
         means = [self.scaler.mean_[x] for x in self.target_label_indices]
         stds = [self.scaler.scale_[x] for x in self.target_label_indices]
         
-        for step in range(self.train_config.pred_sequence_length):
+        for step in range(self.data_config.pred_sequence_length):
             
             p = preds[:, step, :]
             t = targs[:, step, :]
@@ -209,7 +201,7 @@ class Evaluate():
         fig.suptitle('MAE')
         for i in range(error_matrix.shape[1]):
             axis[i].bar(range(error_matrix.shape[0]), error_matrix.T[i], align='center')
-            axis[i].set_title(f'{self.train_config.parks[i]} - total {dataset_name} MAE: {total_mae}')
+            axis[i].set_title(f'{self.data_config.parks[i]} - total {dataset_name} MAE: {total_mae}')
             axis[i].set_xlabel('hours ahead')
             axis[i].set_ylabel('MAE')
             axis[i].set_xticks(range(error_matrix.shape[0]))
@@ -226,21 +218,21 @@ class Evaluate():
         
         persistence_error_matrix = np.zeros_like(self.train_error_matrix) #(5,4)
         
-        for i in range(self.train_config.pred_sequence_length):
+        for i in range(self.data_config.pred_sequence_length):
             for col in prod_columns:
                 prod[f'{col}_shift({i+1})'] = prod[col].shift(i+1).values
         if dataset_name=='train':
-            prod = prod.loc[:self.train_config.valid_start-timedelta(hours=1)].dropna(axis=0)
+            prod = prod.loc[:self.data_config.valid_start-timedelta(hours=1)].dropna(axis=0)
         elif dataset_name=='valid':
             prod = prod.loc[
-                self.train_config.valid_start:self.train_config.test_start-timedelta(hours=1)
+                self.data_config.valid_start:self.data_config.test_start-timedelta(hours=1)
             ].dropna(axis=0)
         elif dataset_name=='test':
-            prod = prod.loc[self.train_config.test_start:].dropna(axis=0)
+            prod = prod.loc[self.data_config.test_start:].dropna(axis=0)
         else:
             raise Exception(f'The dataset name should be either "train", "valid" or "test", not {dataset_name}.')
         
-        for i in range(self.train_config.pred_sequence_length):
+        for i in range(self.data_config.pred_sequence_length):
             for j, col in enumerate(prod_columns):
                 persistence_error_matrix[i,j] = mean_absolute_error(
                     prod[col].values, prod[f'{col}_shift({i+1})'].values)
@@ -290,15 +282,15 @@ class Evaluate():
         plt.xlabel('hours')
         index = 1
         n_samples_shown = np.minimum(50, targs_unscaled.shape[0])
-        n_plots = self.train_config.pred_sequence_length*len(self.train_config.parks)
-        for i in range(self.train_config.pred_sequence_length):
-            for j in range(len(self.train_config.parks)):
-                plt.subplot(self.train_config.pred_sequence_length, len(self.train_config.parks), index) #(nrows, ncols, index)
+        n_plots = self.data_config.pred_sequence_length*len(self.data_config.parks)
+        for i in range(self.data_config.pred_sequence_length):
+            for j in range(len(self.data_config.parks)):
+                plt.subplot(self.data_config.pred_sequence_length, len(self.data_config.parks), index) #(nrows, ncols, index)
                 plt.plot(np.ravel(np.array(targs_unscaled)[:n_samples_shown, i, j]), label='targets')
                 plt.plot(np.ravel(np.array(preds_unscaled)[:n_samples_shown, i, j]), label='predicitions')
                 
                 
-                plt.title(f'{i+1}h ahead at {self.park_name[self.train_config.parks[j]]}, {dataset_name} set', fontsize=8)
+                plt.title(f'{i+1}h ahead at {self.park_name[self.data_config.parks[j]]}, {dataset_name} set', fontsize=8)
                 if index==n_plots:
                     plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=8)
                     plt.xticks(fontsize=8)
