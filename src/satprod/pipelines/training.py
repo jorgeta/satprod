@@ -304,10 +304,7 @@ def train_loop(net, train_config: TrainConfig, data_config: DataConfig, data: Wi
         else:
             current_batch_size = data_dict['X_prod'].shape[0]
         
-        output = best_model(data_dict)
-        
-        if data_config.model=='TCN_Bai' or data_config.model=='TCN':
-            output = output[:, -pred_sequence_length:, :]
+        output = best_model(data_dict)[:, -pred_sequence_length:, :]
         
         test_targs += list(data_dict['y_prod'].data.cpu().numpy())
         test_preds += list(output.data.cpu().numpy())
