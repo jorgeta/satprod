@@ -20,7 +20,8 @@ class TCN(nn.Module):
                 lenet_params: dict=None,
                 deepsense_params: dict=None,
                 img_extraction_method: str=None,
-                dropout: float=0.0
+                dropout: float=0.0,
+                only_predict_future_values: bool=False
                 ):
         super(TCN, self).__init__()
         self.name = 'TCN'
@@ -34,6 +35,7 @@ class TCN(nn.Module):
         self.num_forecast_features = num_forecast_features
         self.num_image_features = 0
         self.dropout = dropout
+        self.only_predict_future_values = only_predict_future_values
         
         self.img_extraction_method = img_extraction_method
         if self.img_extraction_method=='lenet':
@@ -105,7 +107,10 @@ class TCN(nn.Module):
         
         x = self.tcn_stack(x.transpose(1,2)).transpose(1, 2)
         
-        return self.linear(x)#[:, -self.pred_sequence_length:, :]
+        if self.only_predict_future_values:
+            return self.linear(x)[:, -self.pred_sequence_length:, :]
+        else:
+            return self.linear(x)
 
 class ResidualBlock(nn.Module):
     

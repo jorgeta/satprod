@@ -57,6 +57,19 @@ def train_model(config):
     )
 
 def train_loop(net, train_config: TrainConfig, data_config: DataConfig, data: WindDataset):
+    """Train the input network on the given dataset, using parameters from he train and data configs.
+
+    Args:
+        net: the network to train
+        train_config (TrainConfig): a dataclass containing parameters specific to training
+        data_config (DataConfig): a dataclass containing which model and which features and splits to use
+        data (WindDataset): the dataset structured to fit the model
+
+    Returns:
+        best_model: the trained network with the lowest validation error
+        results (Results): a dataclass containing results and predictions
+    """
+    
     sequence_length = net.sequence_length
     logging.info(f'Model: {net.name}')
     logging.info(f'Sequence length: {sequence_length}')
@@ -171,11 +184,12 @@ def train_loop(net, train_config: TrainConfig, data_config: DataConfig, data: Wi
             output = net(data_dict)
             
             # compute gradients given loss
+            y = data_dict['y_prod']
             if data_config.model=='TCN_Bai' or data_config.model=='TCN':
-                y = torch.cat([data_dict['X_prod'][:, pred_sequence_length:, :], data_dict['y_prod']], dim=1)
-                batch_loss = criterion(output, y)
-            else:
-                batch_loss = criterion(output, data_dict['y_prod'])
+                if not net.only_predict_future_values:
+                    y = torch.cat([data_dict['X_prod'][:, pred_sequence_length:, :], data_dict['y_prod']], dim=1)
+            
+            batch_loss = criterion(output, y)
             
             batch_loss.backward()
             optimizer.step()
@@ -292,7 +306,7 @@ def train_loop(net, train_config: TrainConfig, data_config: DataConfig, data: Wi
         
         output = best_model(data_dict)
         
-        if data_config.model=='TCN_Bai' or 'TCN':
+        if data_config.model=='TCN_Bai' or data_config.model=='TCN':
             output = output[:, -pred_sequence_length:, :]
         
         test_targs += list(data_dict['y_prod'].data.cpu().numpy())
@@ -517,7 +531,8 @@ def init_data_and_model(config):
         'lenet_params' : lenet_params,
         'resnet_params' : resnet_params,
         'deepsense_params' : deepsense_params,
-        'dropout': config.models.tcn.dropout
+        'dropout': config.models.tcn.dropout,
+        'only_predict_future_values': config.models.tcn.only_predict_future_values
     }
     
     tcn_bai_params = {

@@ -1,6 +1,6 @@
 app: satprod
 
-model: 'LSTM' #'LSTM', 'TCN', 'AGRU', 'TCN_Bai', 'MLR'
+model: 'TCN' #'LSTM', 'TCN', 'AGRU', 'TCN_Bai', 'MLR'
 train_on_one_batch: False
 
 data_config:
@@ -48,6 +48,7 @@ models:
     kernel_size: 3
     dilation_base: 2
     dropout: 0.2
+    only_predict_future_values: True
   tcn_bai:
     channels: [32, 32, 32]
     kernel_size: 3
