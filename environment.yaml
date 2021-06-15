@@ -21,5 +21,4 @@ dependencies:
     - fire==0.4.0
     - opencv-contrib-python==4.5.1.48
     - tqdm==4.59.0
-    - tikzplotlib=0.9.8
     - -e .

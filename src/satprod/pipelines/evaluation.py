@@ -38,30 +38,43 @@ def store_results(
     data_config: DataConfig, 
     results: Results, 
     scaler,
-    target_label_indices: [int]):
+    target_label_indices: [int],
+    use_img_features: bool,
+    train_on_one_batch: bool,
+    ):
     
     timestamp = datetime.now().strftime('%Y-%m-%d-%H-%M')
     
     if len(data_config.parks)==1: park = data_config.parks[0]
     else: park = 'all'
     
+    if train_on_one_batch:
+        sorting='test'
+    else:
+        sorting='img' if use_img_features else 'num'
+    
     cd = str(os.path.dirname(os.path.abspath(__file__)))
     root = f'{cd}/../../..'
-    path = f'{root}/storage/{park}/{model.name}/{timestamp}'
+    path = f'{root}/storage/{park}/{model.name}/{sorting}/{timestamp}'
     os.makedirs(path, exist_ok=True)
     
     info = (model, results, train_config, data_config, scaler, target_label_indices)
     with open(f'{path}/model_results_config.pickle', 'wb') as storage_file:
         pickle.dump(info, storage_file)
-
-class Evaluate():
+        
+    # test evaluation and write plots
     
-    def __init__(self, timestamp: str, model_name: str, park: str):
+    modelEval = ModelEvaluation(timestamp, model.name, park, sorting)
+
+class ModelEvaluation():
+    
+    def __init__(self, timestamp: str, model_name: str, park: str, sorting: str):
         cd = str(os.path.dirname(os.path.abspath(__file__)))
         self.root = f'{cd}/../../..'
         self.timestamp = timestamp
         self.model_name = model_name
         self.park = park
+        self.sorting = sorting
         
         self.park_name = {
             'bess': 'Bessakerfjellet', 
@@ -82,10 +95,13 @@ class Evaluate():
             self.results.val_targs
         )
         
-        self.test_preds_unscaled, self.test_targs_unscaled = self.unscale_predictions(
-            self.results.test_preds, 
-            self.results.test_targs
-        )
+        try:
+            self.test_preds_unscaled, self.test_targs_unscaled = self.unscale_predictions(
+                self.results.test_preds, 
+                self.results.test_targs
+            )
+        except:
+            raise Exception(f'The following model does not conform with the update system: {self.park}, {self.timestamp}, {self.model_name}, {self.sorting}.')
         
         self.train_mae, self.train_error_matrix = self.get_errors(self.train_preds_unscaled, self.train_targs_unscaled)
         self.valid_mae, self.valid_error_matrix = self.get_errors(self.valid_preds_unscaled, self.valid_targs_unscaled)
@@ -93,10 +109,21 @@ class Evaluate():
         
         logging.info(f'{self.model_name} Valid MAEs:\n{self.valid_error_matrix}')
         
+        self.plot_training_curve()
+        
+        self.info()
+        
         self.plot_errors(self.train_error_matrix, 'train', self.train_mae)
         self.plot_errors(self.valid_error_matrix, 'valid', self.valid_mae)
         self.plot_errors(self.test_error_matrix, 'test', self.test_mae)
         
+        self.plot_fitting_example(self.train_preds_unscaled, self.train_targs_unscaled, 'train')
+        self.plot_fitting_example(self.valid_preds_unscaled, self.valid_targs_unscaled, 'valid')
+        self.plot_fitting_example(self.test_preds_unscaled, self.test_targs_unscaled, 'test')
+        
+        
+        
+        '''
         self.persistence_train_mae, self.persistence_train_error_matrix = self.persistence('train')
         self.persistence_valid_mae, self.persistence_valid_error_matrix = self.persistence('valid')
         self.persistence_test_mae, self.persistence_test_error_matrix = self.persistence('test')
@@ -106,17 +133,10 @@ class Evaluate():
         self.baseline_comparisons(self.train_error_matrix, self.persistence_train_error_matrix, 'train')
         self.baseline_comparisons(self.valid_error_matrix, self.persistence_valid_error_matrix, 'valid')
         self.baseline_comparisons(self.test_error_matrix, self.persistence_test_error_matrix, 'test')
-
-        self.plot_fitting_example(self.train_preds_unscaled, self.train_targs_unscaled, 'train')
-        self.plot_fitting_example(self.valid_preds_unscaled, self.valid_targs_unscaled, 'valid')
-        self.plot_fitting_example(self.test_preds_unscaled, self.test_targs_unscaled, 'test')
-        
-        self.plot_training_curve()
-        
-        self.info()
+        '''
     
     def get_stored_results(self):
-        self.path = f'{self.root}/storage/{self.park}/{self.model_name}/{self.timestamp}'
+        self.path = f'{self.root}/storage/{self.park}/{self.model_name}/{self.sorting}/{self.timestamp}'
         with open(f'{self.path}/model_results_config.pickle', 'rb') as storage_file:
             net, results, train_config, data_config, scaler, target_label_indices = pickle.load(storage_file)
             
@@ -178,7 +198,7 @@ class Evaluate():
             targs[:, step, :] = t
         
         return preds, targs
-        
+    
     def get_errors(self, preds_unscaled, targs_unscaled):
         mae = mean_absolute_error(np.ravel(targs_unscaled), np.ravel(preds_unscaled))
         
@@ -188,7 +208,7 @@ class Evaluate():
                 error_matrix[i][j] = mean_absolute_error(targs_unscaled[:,i,j], preds_unscaled[:,i,j])
         
         return mae, error_matrix
-        
+    
     def plot_errors(self, error_matrix: [[float]], dataset_name: str, total_mae: float):
         fig, axs = plt.subplots(error_matrix.shape[1], 1, constrained_layout=True)
         
@@ -208,8 +228,50 @@ class Evaluate():
             axis[i].set_xticklabels([f'{h+1}' for h in range(error_matrix.shape[0])])
         plt.savefig(f'{self.path}/{dataset_name}_maes.png')
         plt.close()
-        #plt.show()
     
+    def plot_fitting_example(self, preds_unscaled, targs_unscaled, dataset_name: str):
+        
+        plt.figure()
+        plt.ylabel('production (kWh/h)')
+        plt.xlabel('hours')
+        index = 1
+        n_samples_shown = np.minimum(50, targs_unscaled.shape[0])
+        n_plots = self.data_config.pred_sequence_length*len(self.data_config.parks)
+        for i in range(self.data_config.pred_sequence_length):
+            for j in range(len(self.data_config.parks)):
+                plt.subplot(self.data_config.pred_sequence_length, len(self.data_config.parks), index) #(nrows, ncols, index)
+                plt.plot(np.ravel(np.array(targs_unscaled)[:n_samples_shown, i, j]), label='targets')
+                plt.plot(np.ravel(np.array(preds_unscaled)[:n_samples_shown, i, j]), label='predicitions')
+                
+                
+                plt.title(f'{i+1}h ahead at {self.park_name[self.data_config.parks[j]]}, {dataset_name} set', fontsize=8)
+                if index==n_plots:
+                    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=8)
+                    plt.xticks(fontsize=8)
+                    plt.yticks(fontsize=8)
+                else:
+                    plt.xticks([])
+                plt.tight_layout()
+                index += 1
+        plt.tight_layout()
+        plt.savefig(f'{self.path}/{dataset_name}_fitting_examples.png')
+        plt.close()
+        
+    def plot_training_curve(self):
+        
+        epochs = np.arange(len(self.results.train_mae))
+        plt.plot(epochs, self.results.train_mae, 'r', epochs, self.results.valid_mae, 'b')
+        plt.legend(['train MAE','validation MAE'])
+        plt.xlabel('epochs')
+        plt.ylabel('MAE')
+        plt.axvline(x=self.results.epoch)
+        
+        plt.savefig(f'{self.path}/training_curve.png')
+        plt.close()
+        
+        
+        
+        
     def persistence(self, dataset_name: str):
         
         # get relevant production
@@ -273,44 +335,4 @@ class Evaluate():
         
         fig.tight_layout()
         plt.savefig(f'{self.path}/{dataset_name}_error_comparison.png')
-        plt.close()
-    
-    def plot_fitting_example(self, preds_unscaled, targs_unscaled, dataset_name: str):
-        
-        plt.figure()
-        plt.ylabel('production (kWh/h)')
-        plt.xlabel('hours')
-        index = 1
-        n_samples_shown = np.minimum(50, targs_unscaled.shape[0])
-        n_plots = self.data_config.pred_sequence_length*len(self.data_config.parks)
-        for i in range(self.data_config.pred_sequence_length):
-            for j in range(len(self.data_config.parks)):
-                plt.subplot(self.data_config.pred_sequence_length, len(self.data_config.parks), index) #(nrows, ncols, index)
-                plt.plot(np.ravel(np.array(targs_unscaled)[:n_samples_shown, i, j]), label='targets')
-                plt.plot(np.ravel(np.array(preds_unscaled)[:n_samples_shown, i, j]), label='predicitions')
-                
-                
-                plt.title(f'{i+1}h ahead at {self.park_name[self.data_config.parks[j]]}, {dataset_name} set', fontsize=8)
-                if index==n_plots:
-                    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=8)
-                    plt.xticks(fontsize=8)
-                    plt.yticks(fontsize=8)
-                else:
-                    plt.xticks([])
-                plt.tight_layout()
-                index += 1
-        plt.tight_layout()
-        plt.savefig(f'{self.path}/{dataset_name}_fitting_examples.png')
-        plt.close()
-        
-    def plot_training_curve(self):
-        
-        epochs = np.arange(len(self.results.train_mae))
-        plt.plot(epochs, self.results.train_mae, 'r', epochs, self.results.valid_mae, 'b')
-        plt.legend(['train MAE','validation MAE'])
-        plt.xlabel('epochs')
-        plt.ylabel('MAE')
-        plt.axvline(x=self.results.epoch)
-        
-        plt.savefig(f'{self.path}/training_curve.png')
         plt.close()

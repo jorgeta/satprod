@@ -3,6 +3,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 import os
 from sklearn.linear_model import LinearRegression
+from satprod.configs.config_utils import read_yaml
 
 from satprod.data_handlers.data_utils import sin_transform, cos_transform, get_columns
 
@@ -13,12 +14,14 @@ class NumericalDataHandler():
     def __init__(self, pred_horizon: int=5, valid_start_date: datetime=datetime(2019, 5, 13, 0)):
         cd = str(os.path.dirname(os.path.abspath(__file__)))
         self.root = f'{cd}/../../..'
+        self.config = read_yaml(f'{self.root}/config.yaml')
         self.parks = ['bess', 'skom', 'vals', 'yvik']
         self.raw_prod_data_path = f'{self.root}/data/measured_prod'
         self.raw_wind_data_path = f'{self.root}/data/weather_forecasts'
         self.old_raw_data_path = f'{self.root}/data/old_data/num'
         self.old_formatted_data_path = f'{self.root}/data/old_data/formatted'
         self.formatted_data_path = f'{self.root}/data/formatted'
+        self.benchmark_data_path = f'{self.root}/data/prod_forecasts'
         
         os.makedirs(f'{self.raw_prod_data_path}', exist_ok=True)
         os.makedirs(f'{self.raw_wind_data_path}', exist_ok=True)
@@ -26,7 +29,9 @@ class NumericalDataHandler():
         os.makedirs(f'{self.formatted_data_path}', exist_ok=True)
         
         self.pred_horizon = pred_horizon
-        self.valid_start_date = valid_start_date
+        self.valid_start_date = datetime(**self.config.data_config.valid_start)
+        self.test_start_date = datetime(**self.config.data_config.test_start)
+        self.test_end_date = datetime(**self.config.data_config.test_end)
         
         # treat inf values as NaN
         pd.options.mode.use_inf_as_na = True
@@ -39,8 +44,17 @@ class NumericalDataHandler():
         
         prod_df = self.get_prod_data()
         logging.info('Removing first half year of production data at the different parks.')
+        
+        start_dates = {
+            'bess': '2009-01-23 00:00:00', 
+            'skom': '2016-09-08 00:00:00', 
+            'vals': '2007-04-28 00:00:00',
+            'yvik': '2015-10-16 10:00:00'
+        }
+
         for park in self.parks:
-            prod_df[f'production_{park}'].iloc[:24*183] = np.nan
+            date = datetime.strptime(start_dates[park], '%Y-%m-%d %H:%M:%S')-timedelta(hours=1)
+            prod_df[f'production_{park}'].loc[:date] = np.nan
         
         logging.info('Replacing outliers with NaN.')
         prod_df = self.__clean_prod_data(prod_df)
@@ -63,6 +77,24 @@ class NumericalDataHandler():
         df['time'] = pd.to_datetime(df['time'])
         df = df.set_index(['time'])
         return df
+    
+    def read_benchmark_data(self):
+        for park in self.parks:
+            df = pd.read_csv(f'{self.benchmark_data_path}/{park}_prod_forecasts.csv')
+            #print(df)
+            df = df.drop(columns=['Unnamed: 0', 'time'])
+            df['time'] = pd.to_datetime(df['pred_time'])
+            df = df.drop(columns=['pred_time'])
+            #df['horizon'] = df['horizon'].astype(str)
+            
+            df = pd.pivot_table(df, values='predicted',index='time',columns='horizon')
+            
+            for col in df.columns:
+                if col > 5 or col==0:
+                    df = df.drop(columns=col)
+                    
+            print(df)
+            break
     
     def get_wind_data(self) -> pd.DataFrame:
         weather = {}

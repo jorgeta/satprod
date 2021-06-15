@@ -1,7 +1,7 @@
 app: satprod
 
 model: 'TCN' #'LSTM', 'TCN', 'AGRU', 'TCN_Bai', 'MLR'
-train_on_one_batch: False
+train_on_one_batch: True
 
 data_config:
   parks: ['skom'] # ['bess', 'vals','skom','yvik']
@@ -19,7 +19,7 @@ data_config:
 
 train_config:
   batch_size: 64
-  num_epochs: 50
+  num_epochs: 5
   learning_rate: 4.0e-3
   scheduler_gamma: 0.9
   random_seed: 0
@@ -56,3 +56,40 @@ models:
   mlr:
     sequence_length: 3
 
+comparison: # {'timestamp': , 'model_name': , 'sorting': 'num'}
+  skom: 
+    model1: #{'timestamp': '2021-06-10-01-23', 'model_name': 'LSTM', 'sorting': 'img'}
+    model2: #{'timestamp': '2021-06-12-23-22', 'model_name': 'LSTM', 'sorting': 'num'}
+    model3: {'timestamp': '2021-06-14-02-03', 'model_name': 'LSTM', 'sorting': 'num'}
+    model4: #{'timestamp': '2021-06-11-05-21', 'model_name': 'MLR', 'sorting': 'num'}
+    model5: {'timestamp': '2021-06-13-06-27', 'model_name': 'MLR', 'sorting': 'num'}
+    model6: {'timestamp': '2021-06-14-13-02', 'model_name': 'TCN', 'sorting': 'num'}
+    model7: {'timestamp': '2021-06-15-21-27', 'model_name': 'TCN', 'sorting': 'num'}
+  bess:
+    model1:
+    model2:
+    model3:
+    model4:
+    model5:
+    model6:
+  vals:
+    model1:
+    model2:
+    model3:
+    model4:
+    model5:
+    model6:
+  yvik:
+    model1:
+    model2:
+    model3:
+    model4:
+    model5:
+    model6:
+  all:
+    model1:
+    model2:
+    model3:
+    model4:
+    model5:
+    model6:

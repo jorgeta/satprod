@@ -22,7 +22,7 @@ from satprod.ml.mlr import MLR
 
 from satprod.data_handlers.data_utils import get_columns
 from satprod.configs.job_configs import TrainConfig, DataConfig
-from satprod.pipelines.evaluation import Results, Evaluate, store_results
+from satprod.pipelines.evaluation import Results, ModelEvaluation, store_results
 
 from tasklog.tasklogger import logging
 from tqdm import tqdm
@@ -53,7 +53,9 @@ def train_model(config):
         data_config=data_config,
         results=results,
         scaler=dataset.scaler,
-        target_label_indices=dataset.target_label_indices
+        target_label_indices=dataset.target_label_indices,
+        use_img_features=data_config.use_img_features,
+        train_on_one_batch=config.train_on_one_batch
     )
 
 def train_loop(net, train_config: TrainConfig, data_config: DataConfig, data: WindDataset):
@@ -64,7 +66,7 @@ def train_loop(net, train_config: TrainConfig, data_config: DataConfig, data: Wi
         train_config (TrainConfig): a dataclass containing parameters specific to training
         data_config (DataConfig): a dataclass containing which model and which features and splits to use
         data (WindDataset): the dataset structured to fit the model
-
+    
     Returns:
         best_model: the trained network with the lowest validation error
         results (Results): a dataclass containing results and predictions

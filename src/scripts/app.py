@@ -12,8 +12,9 @@ from satprod.optical_flow.optical_flow_optim import OpticalFlowOptim
 from satprod.optical_flow.optical_flow import OpticalFlow
 from satprod.data_handlers.num_data import NumericalDataHandler
 from satprod.pipelines.training import train_model
-from satprod.pipelines.evaluation import Evaluate
+from satprod.pipelines.evaluation import ModelEvaluation
 from satprod.pipelines.dataset import WindDataset
+from satprod.pipelines.comparison import ModelComparison
 from satprod.configs.job_configs import TrainConfig
 
 from tasklog.tasklogger import init_logger
@@ -40,10 +41,14 @@ class App:
         train_model(self.config)
         
     def evaluate(self):
-        model_name = 'LSTM'
-        timestamp = '2021-06-12-23-22'
+        model_name = 'TCN'
+        timestamp = '2021-06-15-21-56'
         park = 'skom'
-        evaluate = Evaluate(timestamp=timestamp, model_name=model_name, park=park)
+        sorting = 'test'
+        ModelEvaluation(timestamp=timestamp, model_name=model_name, park=park, sorting=sorting)
+        
+    def compare(self, park: str):
+        ModelComparison(park, self.config.comparison)
     
     def satellite_video(self, date: datetime=datetime(2019,6,3), play=False):
         """Create and save satvid with name giving information about the test.
