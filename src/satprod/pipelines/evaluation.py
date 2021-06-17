@@ -7,6 +7,7 @@ import torch
 from sklearn.metrics import mean_absolute_error
 from matplotlib import pyplot as plt
 import pickle
+from numpy import savetxt, loadtxt
 
 from satprod.configs.config_utils import TimeInterval
 from satprod.configs.job_configs import TrainConfig, DataConfig
@@ -58,6 +59,18 @@ def store_results(
     path = f'{root}/storage/{park}/{model.name}/{sorting}/{timestamp}'
     os.makedirs(path, exist_ok=True)
     
+    results.corr_train_preds = np.array(results.corr_train_preds)
+    results.train_targs = np.array(results.train_targs)
+    
+    results.corr_train_preds = results.corr_train_preds.reshape(-1, data_config.pred_sequence_length*len(target_label_indices))
+    results.train_targs = results.train_targs.reshape(-1, data_config.pred_sequence_length*len(target_label_indices))
+    
+    savetxt(f'{path}/corr_train_preds.csv', results.corr_train_preds, delimiter=',')
+    savetxt(f'{path}/train_targs.csv', results.train_targs, delimiter=',')
+    
+    results.corr_train_preds = None
+    results.train_targs = None
+    
     info = (model, results, train_config, data_config, scaler, target_label_indices)
     with open(f'{path}/model_results_config.pickle', 'wb') as storage_file:
         pickle.dump(info, storage_file)
@@ -101,13 +114,13 @@ class ModelEvaluation():
                 self.results.test_targs
             )
         except:
-            raise Exception(f'The following model does not conform with the update system: {self.park}, {self.timestamp}, {self.model_name}, {self.sorting}.')
+            raise Exception(f'The model does not conform with the update system: {self.park}, {self.timestamp}, {self.model_name}, {self.sorting}.')
         
         self.train_mae, self.train_error_matrix = self.get_errors(self.train_preds_unscaled, self.train_targs_unscaled)
         self.valid_mae, self.valid_error_matrix = self.get_errors(self.valid_preds_unscaled, self.valid_targs_unscaled)
         self.test_mae, self.test_error_matrix = self.get_errors(self.test_preds_unscaled, self.test_targs_unscaled)
         
-        logging.info(f'{self.model_name} Valid MAEs:\n{self.valid_error_matrix}')
+        logging.info(f'{self.model_name} Test MAEs:\n{self.test_error_matrix}')
         
         self.plot_training_curve()
         
@@ -120,26 +133,12 @@ class ModelEvaluation():
         self.plot_fitting_example(self.train_preds_unscaled, self.train_targs_unscaled, 'train')
         self.plot_fitting_example(self.valid_preds_unscaled, self.valid_targs_unscaled, 'valid')
         self.plot_fitting_example(self.test_preds_unscaled, self.test_targs_unscaled, 'test')
-        
-        
-        
-        '''
-        self.persistence_train_mae, self.persistence_train_error_matrix = self.persistence('train')
-        self.persistence_valid_mae, self.persistence_valid_error_matrix = self.persistence('valid')
-        self.persistence_test_mae, self.persistence_test_error_matrix = self.persistence('test')
-        
-        logging.info(f'Persistence Valid MAEs:\n{self.persistence_valid_error_matrix}')
-        
-        self.baseline_comparisons(self.train_error_matrix, self.persistence_train_error_matrix, 'train')
-        self.baseline_comparisons(self.valid_error_matrix, self.persistence_valid_error_matrix, 'valid')
-        self.baseline_comparisons(self.test_error_matrix, self.persistence_test_error_matrix, 'test')
-        '''
     
     def get_stored_results(self):
         self.path = f'{self.root}/storage/{self.park}/{self.model_name}/{self.sorting}/{self.timestamp}'
         with open(f'{self.path}/model_results_config.pickle', 'rb') as storage_file:
             net, results, train_config, data_config, scaler, target_label_indices = pickle.load(storage_file)
-            
+        
         self.net = net
         self.results = results
         self.train_config = train_config
@@ -147,6 +146,14 @@ class ModelEvaluation():
         self.scaler = scaler
         self.target_label_indices = target_label_indices
         self.wind_dataset = WindDataset(self.data_config)
+        
+        self.results.corr_train_preds = loadtxt(f'{self.path}/corr_train_preds.csv', delimiter=',')
+        self.results.train_targs = loadtxt(f'{self.path}/train_targs.csv', delimiter=',')
+        
+        self.results.corr_train_preds = self.results.corr_train_preds.reshape(
+            -1, self.data_config.pred_sequence_length, len(self.target_label_indices))
+        self.results.train_targs = self.results.train_targs.reshape(
+            -1, self.data_config.pred_sequence_length, len(self.target_label_indices))
     
     def info(self, to_console: bool=False):
         info_str = f'\nTimestamp: {self.timestamp}\nPark: {self.park}\nModel: {self.model_name}'
@@ -269,70 +276,3 @@ class ModelEvaluation():
         plt.savefig(f'{self.path}/training_curve.png')
         plt.close()
         
-        
-        
-        
-    def persistence(self, dataset_name: str):
-        
-        # get relevant production
-        prod = get_columns(self.wind_dataset.data_unscaled, 'production')
-        prod_columns = prod.columns
-        
-        persistence_error_matrix = np.zeros_like(self.train_error_matrix) #(5,4)
-        
-        for i in range(self.data_config.pred_sequence_length):
-            for col in prod_columns:
-                prod[f'{col}_shift({i+1})'] = prod[col].shift(i+1).values
-        if dataset_name=='train':
-            prod = prod.loc[:self.data_config.valid_start-timedelta(hours=1)].dropna(axis=0)
-        elif dataset_name=='valid':
-            prod = prod.loc[
-                self.data_config.valid_start:self.data_config.test_start-timedelta(hours=1)
-            ].dropna(axis=0)
-        elif dataset_name=='test':
-            prod = prod.loc[self.data_config.test_start:].dropna(axis=0)
-        else:
-            raise Exception(f'The dataset name should be either "train", "valid" or "test", not {dataset_name}.')
-        
-        for i in range(self.data_config.pred_sequence_length):
-            for j, col in enumerate(prod_columns):
-                persistence_error_matrix[i,j] = mean_absolute_error(
-                    prod[col].values, prod[f'{col}_shift({i+1})'].values)
-        
-        persistence_mae = np.mean(np.ravel(persistence_error_matrix))
-        
-        return persistence_mae, persistence_error_matrix
-        
-    def baseline_comparisons(self, error_matrix, persistence_error_matrix, dataset_name: str):
-        self.avg_of_history_error_matrix = None
-        
-        if self.avg_of_history_error_matrix is not None:
-            logging.info(f'Average history based model MAEs:\n{self.avg_of_history_error_matrix}')
-        
-        labels = ['+1h', '+2h', '+3h', '+4h', '+5h']
-        per = np.ravel(persistence_error_matrix)
-        '''if self.avg_of_history_error_matrix is not None:
-            lin = np.ravel(self.avg_of_history_error_matrix)'''
-        lin = None
-        lstm = np.ravel(error_matrix)
-
-        x = np.arange(len(labels))  # the label locations
-        width = 0.35  # the width of the bars
-
-        fig, ax = plt.subplots()
-        rects1 = ax.bar(x - width/2, per, width, label='Persistence')
-        if lin is not None:
-            rects2 = ax.bar(x, lin, width, label='Linear')
-        rects3 = ax.bar(x + width/2, lstm, width, label=f'{self.model_name}')
-
-        # Add some text for labels, title and custom x-axis tick labels, etc.
-        ax.set_ylabel('MAE')
-        ax.set_xlabel('Hours ahead')
-        ax.set_title(f'MAE comparison on the {dataset_name} set')
-        ax.set_xticks(x)
-        ax.set_xticklabels(labels)
-        ax.legend()
-        
-        fig.tight_layout()
-        plt.savefig(f'{self.path}/{dataset_name}_error_comparison.png')
-        plt.close()

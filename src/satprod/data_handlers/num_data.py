@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
 import os
+import pickle
 from sklearn.linear_model import LinearRegression
 from satprod.configs.config_utils import read_yaml
 
@@ -78,23 +79,27 @@ class NumericalDataHandler():
         df = df.set_index(['time'])
         return df
     
-    def read_benchmark_data(self):
+    def format_benchmark_data(self):
+        park_dfs = {}
         for park in self.parks:
             df = pd.read_csv(f'{self.benchmark_data_path}/{park}_prod_forecasts.csv')
-            #print(df)
-            df = df.drop(columns=['Unnamed: 0', 'time'])
-            df['time'] = pd.to_datetime(df['pred_time'])
-            df = df.drop(columns=['pred_time'])
-            #df['horizon'] = df['horizon'].astype(str)
             
+            df['time'] = pd.to_datetime(df['pred_time'])
+            df = df.drop(columns=['pred_time', 'Unnamed: 0'])
             df = pd.pivot_table(df, values='predicted',index='time',columns='horizon')
             
             for col in df.columns:
-                if col > 5 or col==0:
+                if col > 5:
                     df = df.drop(columns=col)
-                    
             print(df)
-            break
+            df = df.loc[self.test_start_date:self.test_end_date]
+            
+            df.columns = [str(i) for i in range(self.pred_horizon+1)]
+        
+            path = f'{self.root}/storage/{park}/TE'
+            os.makedirs(path, exist_ok=True)
+            with open(f'{path}/TE_predictions.pickle', 'wb') as pred_file:
+                best_model = pickle.dump(df, pred_file)
     
     def get_wind_data(self) -> pd.DataFrame:
         weather = {}

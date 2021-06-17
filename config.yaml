@@ -4,7 +4,7 @@ model: 'TCN' #'LSTM', 'TCN', 'AGRU', 'TCN_Bai', 'MLR'
 train_on_one_batch: True
 
 data_config:
-  parks: ['skom'] # ['bess', 'vals','skom','yvik']
+  parks: ['bess'] # ['bess', 'vals','skom','yvik']
   numerical_features: ['production', 'speed', 'direction']
   use_img_features: False
   img_extraction_method: 'lenet' # 'lenet', 'deepsense', 'resnet'
@@ -19,7 +19,7 @@ data_config:
 
 train_config:
   batch_size: 64
-  num_epochs: 5
+  num_epochs: 1
   learning_rate: 4.0e-3
   scheduler_gamma: 0.9
   random_seed: 0
@@ -58,38 +58,38 @@ models:
 
 comparison: # {'timestamp': , 'model_name': , 'sorting': 'num'}
   skom: 
-    model1: #{'timestamp': '2021-06-10-01-23', 'model_name': 'LSTM', 'sorting': 'img'}
-    model2: #{'timestamp': '2021-06-12-23-22', 'model_name': 'LSTM', 'sorting': 'num'}
-    model3: {'timestamp': '2021-06-14-02-03', 'model_name': 'LSTM', 'sorting': 'num'}
-    model4: #{'timestamp': '2021-06-11-05-21', 'model_name': 'MLR', 'sorting': 'num'}
-    model5: {'timestamp': '2021-06-13-06-27', 'model_name': 'MLR', 'sorting': 'num'}
-    model6: {'timestamp': '2021-06-14-13-02', 'model_name': 'TCN', 'sorting': 'num'}
-    model7: {'timestamp': '2021-06-15-21-27', 'model_name': 'TCN', 'sorting': 'num'}
+    model1: {'timestamp': '2021-06-13-06-27', 'model_name': 'MLR', 'sorting': 'num'}
+    model2: {'timestamp': '2021-06-14-02-03', 'model_name': 'LSTM', 'sorting': 'num'}
+    model3: {'timestamp': '2021-06-14-13-02', 'model_name': 'TCN', 'sorting': 'num'}
+    model4: {'timestamp': '2021-06-15-21-27', 'model_name': 'TCN', 'sorting': 'num'}
+    model5: 
+    model6: #{'timestamp': '2021-06-10-01-23', 'model_name': 'LSTM', 'sorting': 'img'}
+    model7: #{'timestamp': '2021-06-11-05-21', 'model_name': 'MLR', 'sorting': 'num'}
   bess:
-    model1:
-    model2:
-    model3:
-    model4:
+    model1: {'timestamp': '2021-06-13-18-35', 'model_name': 'MLR', 'sorting': 'num'}
+    model2: {'timestamp': '2021-06-16-00-10', 'model_name': 'LSTM', 'sorting': 'num'}
+    model3: {'timestamp': '2021-06-16-10-47', 'model_name': 'TCN', 'sorting': 'num'}
+    model4: {'timestamp': '2021-06-16-12-22', 'model_name': 'TCN', 'sorting': 'num'}
     model5:
     model6:
   vals:
-    model1:
-    model2:
-    model3:
-    model4:
+    model1: {'timestamp': '2021-06-13-19-14', 'model_name': 'MLR', 'sorting': 'num'}
+    model2: {'timestamp': '2021-06-16-00-51', 'model_name': 'LSTM', 'sorting': 'num'}
+    model3: {'timestamp': '2021-06-16-11-29', 'model_name': 'TCN', 'sorting': 'num'}
+    model4: {'timestamp': '2021-06-16-12-58', 'model_name': 'TCN', 'sorting': 'num'}
     model5:
     model6:
   yvik:
-    model1:
-    model2:
-    model3:
-    model4:
+    model1: {'timestamp': '2021-06-13-07-52', 'model_name': 'MLR', 'sorting': 'num'}
+    model2: {'timestamp': '2021-06-14-07-00', 'model_name': 'LSTM', 'sorting': 'num'}
+    model3: {'timestamp': '2021-06-15-00-25', 'model_name': 'TCN', 'sorting': 'num'}
+    model4: {'timestamp': '2021-06-16-00-15', 'model_name': 'TCN', 'sorting': 'num'}
     model5:
     model6:
   all:
-    model1:
-    model2:
-    model3:
-    model4:
+    model1: {'timestamp': '2021-06-13-06-35', 'model_name': 'MLR', 'sorting': 'num'}
+    model2: {'timestamp': '2021-06-15-21-48', 'model_name': 'TCN', 'sorting': 'num'}
+    model3: {'timestamp': '2021-06-14-14-00', 'model_name': 'TCN', 'sorting': 'num'}
+    model4: {'timestamp': '2021-06-14-02-05', 'model_name': 'LSTM', 'sorting': 'num'}
     model5:
     model6:
