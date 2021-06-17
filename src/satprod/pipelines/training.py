@@ -183,15 +183,19 @@ def train_loop(net, train_config: TrainConfig, data_config: DataConfig, data: Wi
             else:
                 current_batch_size = data_dict['X_prod'].shape[0]
             
+            X_prod = data_dict['X_prod']
+            if 'production' not in data_config.numerical_features:
+                data_dict['X_prod'] = None
+            
             output = net(data_dict)
             
             # compute gradients given loss
-            y = data_dict['y_prod']
+            y_prod = data_dict['y_prod']
             if data_config.model=='TCN_Bai' or data_config.model=='TCN':
                 if not net.only_predict_future_values:
-                    y = torch.cat([data_dict['X_prod'][:, pred_sequence_length:, :], data_dict['y_prod']], dim=1)
+                    y_prod = torch.cat([X_prod[:, pred_sequence_length:, :], data_dict['y_prod']], dim=1)
             
-            batch_loss = criterion(output, y)
+            batch_loss = criterion(output, y_prod)
             
             batch_loss.backward()
             optimizer.step()
@@ -217,10 +221,10 @@ def train_loop(net, train_config: TrainConfig, data_config: DataConfig, data: Wi
             else:
                 current_batch_size = data_dict['X_prod'].shape[0]
             
-            output = net(data_dict)
+            if 'production' not in data_config.numerical_features:
+                data_dict['X_prod'] = None
             
-            if data_config.model=='TCN_Bai' or data_config.model=='TCN':
-                output = output[:, -pred_sequence_length:, :]
+            output = net(data_dict)[:, -pred_sequence_length:, :]
             
             train_targs += list(data_dict['y_prod'].data.cpu().numpy())
             train_preds += list(output.data.cpu().numpy())
@@ -245,10 +249,10 @@ def train_loop(net, train_config: TrainConfig, data_config: DataConfig, data: Wi
             else:
                 current_batch_size = data_dict['X_prod'].shape[0]
             
-            output = net(data_dict)
+            if 'production' not in data_config.numerical_features:
+                data_dict['X_prod'] = None
             
-            if data_config.model=='TCN_Bai' or data_config.model=='TCN':
-                output = output[:, -pred_sequence_length:, :]
+            output = net(data_dict)[:, -pred_sequence_length:, :]
             
             val_targs += list(data_dict['y_prod'].data.cpu().numpy())
             val_preds += list(output.data.cpu().numpy())
@@ -401,13 +405,14 @@ def get_sequenced_data(
             forecast_weather_array.append(forecast_data)
         
         input_prod = torch.from_numpy(get_columns(input_data, 'production').values)
-        input_data = input_data.drop(columns=get_columns(input_data, 'production').columns)
         
-        input_data = torch.from_numpy(input_data.values)
+        input_data = input_data.drop(columns=get_columns(input_data, 'production').columns)
+        if not input_data.empty:
+            input_data = torch.from_numpy(input_data.values)
+            input_weather_array.append(input_data)
         target_data = torch.from_numpy(target_data.values)
         
         # add to array
-        input_weather_array.append(input_data)
         input_prod_array.append(input_prod)
         target_prod_array.append(target_data)
     
@@ -415,11 +420,13 @@ def get_sequenced_data(
     if len(input_prod_array)==0 or len(target_prod_array)==0: return data_dict
     
     X_prod = torch.stack(input_prod_array)
-    X_weather = torch.stack(input_weather_array)
+    if len(input_weather_array) > 0:
+        X_weather = torch.stack(input_weather_array)
+        data_dict['X_weather'] = Variable(X_weather).float().to(device)
+    
     y_prod = torch.stack(target_prod_array)
     
     data_dict['X_prod'] = Variable(X_prod).float().to(device)
-    data_dict['X_weather'] = Variable(X_weather).float().to(device)
     data_dict['y_prod'] = Variable(y_prod).float().to(device)
     
     if data.n_image_features > 0:
@@ -429,7 +436,7 @@ def get_sequenced_data(
             X_img_forecasts = torch.stack(forecast_img_array)
             data_dict['X_img_forecasts'] = Variable(X_img_forecasts).float().to(device)
     
-    if len(forecast_weather_array) > 0:
+    if len(forecast_weather_array) > 0 and len(input_weather_array) > 0:
         X_weather_forecasts = torch.stack(forecast_weather_array)
         data_dict['X_weather_forecasts'] = Variable(X_weather_forecasts).float().to(device)
     
@@ -520,7 +527,7 @@ def init_data_and_model(config):
     
     tcn_params = {
         'num_past_features': wind_dataset.n_past_features,
-        'num_forecast_features': wind_dataset.n_forecast_features,
+        #'num_forecast_features': wind_dataset.n_forecast_features,
         'output_size': wind_dataset.n_output_features,
         'channels': config.models.tcn.channels,
         'kernel_size': config.models.tcn.kernel_size,
@@ -563,8 +570,15 @@ def init_data_and_model(config):
         raise Exception(f'The model "{config.model}" does not exist.')
     
     return net, train_config, data_config, wind_dataset
-
+    
 def temporary_plot(results: Results, val_targs, val_preds):
+    """Shows how the training is progressing during training.
+
+    Args:
+        results (Results): Contains MAEs per epoch of the validation set predictions
+        val_targs ([float]): The validation set targets
+        val_preds ([float]): The validation set predictions made in the current epoch
+    """
     plt.figure(figsize=(16,7))
     plt.subplot(1, 2, 1) #(nrows, ncols, index)
     plt.plot(np.ravel(np.array(val_targs)[:, 0, 0])[:100], label='targs')
@@ -581,4 +595,3 @@ def temporary_plot(results: Results, val_targs, val_preds):
     plt.show(block=False)
     plt.pause(0.25)
     plt.close()
-    

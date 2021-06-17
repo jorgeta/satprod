@@ -10,7 +10,7 @@ class TCN(nn.Module):
     
     def __init__(self,
                 num_past_features: int,
-                num_forecast_features: int, 
+                #num_forecast_features: int, 
                 output_size: int,
                 pred_sequence_length: int = 5,
                 kernel_size: int = 3,
@@ -32,7 +32,7 @@ class TCN(nn.Module):
         self.img_extraction_method = img_extraction_method
         self.channels = channels
         self.num_past_features = num_past_features
-        self.num_forecast_features = num_forecast_features
+        #self.num_forecast_features = num_forecast_features
         self.num_image_features = 0
         self.dropout = dropout
         self.only_predict_future_values = only_predict_future_values
@@ -86,16 +86,29 @@ class TCN(nn.Module):
         x_img = data_dict['X_img']
         x_img_forecasts = data_dict['X_img_forecasts']
         
-        x_weather_forecasts = pad(x_weather_forecasts, (0,x_prod.shape[2]))
-        
-        x = torch.cat([x_weather, x_prod], dim=2)
-        x = torch.cat([x, x_weather_forecasts], dim=1)
-        x = x[:, self.pred_sequence_length:, :]
+        x = None
+        if x_prod is not None:
+            if x_weather_forecasts is not None:
+                x_weather_forecasts = pad(x_weather_forecasts, (0, self.output_size))
+            
+            if x_weather is not None:
+                x = torch.cat([x_weather, x_prod], dim=2)
+        else:
+            if x_weather is not None:
+                x = x_weather
+                
+                if x_weather_forecasts is not None:
+                    x = torch.cat([x, x_weather_forecasts], dim=1)
+        if x is not None:
+            x = x[:, self.pred_sequence_length:, :]
+            self.batch_size = x.shape[0]
+        else:
+            assert x_img is not None, 'Logical error: There is no data to train on.'
         # x shape: (batch_size, sequence_length, n_features) (64, 29, 4)
         
-        self.batch_size = x.shape[0]
+        
         if x_img is not None:
-            assert x_img_forecasts is not None
+            assert x_img_forecasts is not None, 'The model requires image forecasts when images are used.'
             self.batch_size = x_img.shape[0]
             
             x_img = torch.cat([x_img, x_img_forecasts], dim=1)

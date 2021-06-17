@@ -4,14 +4,14 @@ model: 'TCN' #'LSTM', 'TCN', 'AGRU', 'TCN_Bai', 'MLR'
 train_on_one_batch: True
 
 data_config:
-  parks: ['bess'] # ['bess', 'vals','skom','yvik']
-  numerical_features: ['production', 'speed', 'direction']
-  use_img_features: False
-  img_extraction_method: 'lenet' # 'lenet', 'deepsense', 'resnet'
+  parks: ['skom'] # ['bess', 'vals','skom','yvik']
+  numerical_features: [] #['production', 'speed', 'direction', 'temporal']
+  use_img_features: True
+  img_extraction_method: 'resnet' # 'lenet', 'deepsense', 'resnet'
   
-  pred_sequence_length: 5
+  pred_sequence_length: 5 # if changing, run 'satprod num update_formatted_files'
   use_numerical_forecasts: True
-  use_img_forecasts: False
+  use_img_forecasts: True
   
   valid_start: {'year': 2019, 'month': 5, 'day': 12, 'hour': 0}
   test_start: {'year': 2020, 'month': 5, 'day': 12, 'hour': 0}
@@ -19,7 +19,7 @@ data_config:
 
 train_config:
   batch_size: 64
-  num_epochs: 1
+  num_epochs: 50
   learning_rate: 4.0e-3
   scheduler_gamma: 0.9
   random_seed: 0
@@ -34,7 +34,7 @@ img_extraction_methods:
     stride_pool: [3, 1]
     padding_pool: [0, 0]
   resnet:
-    output_size: 8
+    output_size: 32
 
 models:
   lstm:
@@ -44,11 +44,11 @@ models:
     num_layers: 1
     dropout: 0.2
   tcn:
-    channels: [32, 32, 32]
+    channels: [32, 32]
     kernel_size: 3
     dilation_base: 2
     dropout: 0.2
-    only_predict_future_values: True
+    only_predict_future_values: False
   tcn_bai:
     channels: [32, 32, 32]
     kernel_size: 3
@@ -70,8 +70,8 @@ comparison: # {'timestamp': , 'model_name': , 'sorting': 'num'}
     model2: {'timestamp': '2021-06-17-16-56', 'model_name': 'TCN', 'sorting': 'num'}
     model3: 
     model4: 
-    model5:
-    model6:
+    model5: 
+    model6: 
   vals:
     model1: {'timestamp': '2021-06-13-19-14', 'model_name': 'MLR', 'sorting': 'num'}
     model2: {'timestamp': '2021-06-16-00-51', 'model_name': 'LSTM', 'sorting': 'num'}

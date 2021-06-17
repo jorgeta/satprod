@@ -49,7 +49,9 @@ class WindDataset(torch.utils.data.Dataset):
             else:
                 park_data.append(get_columns(self.num_data, park))
         
-        self.num_data = pd.concat(park_data, axis=1)
+        num_data_only_parks = pd.concat(park_data, axis=1)
+        self.num_data = pd.concat([num_data_only_parks, get_columns(self.num_data, 'temporal')], axis=1)
+        
         for feature_type in ['speed', 'direction', 'temporal']:
             if feature_type not in self.numerical_features:
                 self.num_data = self.num_data.drop(columns=get_columns(self.num_data, feature_type).columns.values)
@@ -70,7 +72,7 @@ class WindDataset(torch.utils.data.Dataset):
                 
         
         # target labels
-        self.target_labels = list(get_columns(self.num_data,'production').columns)
+        self.target_labels = list(get_columns(self.num_data, 'production').columns)
         
         # image data
         try:
@@ -115,16 +117,24 @@ class WindDataset(torch.utils.data.Dataset):
         # some useful measurements
         self.n_image_features = len(self.img_features)
         self.n_forecast_features = len(get_columns(self.num_data, '+').columns)
-        self.n_unique_forecast_features = len(get_columns(self.num_data, '+1h').columns)
+        #self.n_unique_forecast_features = len(get_columns(self.num_data, '+1h').columns)
         self.n_past_features = len(self.num_data.columns)-self.n_forecast_features
         self.n_output_features = len(self.target_labels)
+        if 'production' not in self.numerical_features:
+            self.n_past_features -= self.n_output_features
+        
+        if len(self.data.columns)<2 and 'production' not in self.numerical_features:
+            str1 = 'The model is not given any input features. Set "use_img_features" to True,'
+            str2 = 'or add any of the suggested feature types to "numerical_features" in config.yaml.'
+            raise Exception(str1+str2)
         
         '''print(self.data.columns)
         print(self.n_image_features)
         print(self.n_forecast_features)
-        print(self.n_unique_forecast_features)
+        #print(self.n_unique_forecast_features)
         print(self.n_past_features)
-        print(self.n_output_features)'''
+        print(self.n_output_features)
+        exit()'''
         
     def update_image_indices(self):
         

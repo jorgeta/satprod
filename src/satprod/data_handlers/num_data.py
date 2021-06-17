@@ -18,7 +18,7 @@ from tasklog.tasklogger import logging
 
 class NumericalDataHandler():
 
-    def __init__(self, pred_horizon: int=5, valid_start_date: datetime=datetime(2019, 5, 13, 0)):
+    def __init__(self):
         cd = str(os.path.dirname(os.path.abspath(__file__)))
         self.root = f'{cd}/../../..'
         self.config = read_yaml(f'{self.root}/config.yaml')
@@ -35,7 +35,7 @@ class NumericalDataHandler():
         os.makedirs(f'{self.old_raw_data_path}', exist_ok=True)
         os.makedirs(f'{self.formatted_data_path}', exist_ok=True)
         
-        self.pred_horizon = pred_horizon
+        self.pred_horizon = self.config.data_config.pred_sequence_length
         self.valid_start_date = datetime(**self.config.data_config.valid_start)
         self.test_start_date = datetime(**self.config.data_config.test_start)
         self.test_end_date = datetime(**self.config.data_config.test_end)
@@ -71,6 +71,9 @@ class NumericalDataHandler():
         # add temporal features
         df['temporal_cos'] = cos_temporal_transform(df.index.dayofyear.values)
         df['temporal_sin'] = sin_temporal_transform(df.index.dayofyear.values)
+        for col in get_columns(df, 'temporal').columns:
+            for i in range(1, self.pred_horizon+1):
+                df[f'{col}+{i}h'] = df[col].shift(periods=-i)
         
         self.write_formatted_data(df, nan=True)
         
@@ -81,6 +84,9 @@ class NumericalDataHandler():
         # add temporal features
         df['temporal_cos'] = cos_temporal_transform(df.index.dayofyear.values)
         df['temporal_sin'] = sin_temporal_transform(df.index.dayofyear.values)
+        for col in get_columns(df, 'temporal').columns:
+            for i in range(1, self.pred_horizon+1):
+                df[f'{col}+{i}h'] = df[col].shift(periods=-i)
         
         self.write_formatted_data(df, nan=False)
     
@@ -107,7 +113,7 @@ class NumericalDataHandler():
             for col in df.columns:
                 if col > 5:
                     df = df.drop(columns=col)
-            print(df)
+            
             df = df.loc[self.test_start_date:self.test_end_date]
             
             df.columns = [str(i) for i in range(self.pred_horizon+1)]
