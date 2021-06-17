@@ -6,7 +6,13 @@ import pickle
 from sklearn.linear_model import LinearRegression
 from satprod.configs.config_utils import read_yaml
 
-from satprod.data_handlers.data_utils import sin_transform, cos_transform, get_columns
+from satprod.data_handlers.data_utils import (
+    sin_transform, 
+    cos_transform, 
+    get_columns,
+    cos_temporal_transform,
+    sin_temporal_transform
+)
 
 from tasklog.tasklogger import logging
 
@@ -61,11 +67,21 @@ class NumericalDataHandler():
         prod_df = self.__clean_prod_data(prod_df)
         
         df = pd.concat([wind_df, prod_df], axis=1).asfreq('H')
+        
+        # add temporal features
+        df['temporal_cos'] = cos_temporal_transform(df.index.dayofyear.values)
+        df['temporal_sin'] = sin_temporal_transform(df.index.dayofyear.values)
+        
         self.write_formatted_data(df, nan=True)
         
         # fill isolated missing values
         prod_df = self.__fill_missing_prod_values(prod_df, wind_df)
         df = pd.concat([wind_df, prod_df], axis=1).asfreq('H')
+        
+        # add temporal features
+        df['temporal_cos'] = cos_temporal_transform(df.index.dayofyear.values)
+        df['temporal_sin'] = sin_temporal_transform(df.index.dayofyear.values)
+        
         self.write_formatted_data(df, nan=False)
     
     def write_formatted_data(self, df: pd.DataFrame, nan: bool):

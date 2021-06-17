@@ -50,7 +50,7 @@ class WindDataset(torch.utils.data.Dataset):
                 park_data.append(get_columns(self.num_data, park))
         
         self.num_data = pd.concat(park_data, axis=1)
-        for feature_type in ['speed', 'direction']:
+        for feature_type in ['speed', 'direction', 'temporal']:
             if feature_type not in self.numerical_features:
                 self.num_data = self.num_data.drop(columns=get_columns(self.num_data, feature_type).columns.values)
         if not self.use_numerical_forecasts:
@@ -213,7 +213,7 @@ class WindDataset(torch.utils.data.Dataset):
         
         self.data = pd.concat([num_data_scaled, img_data], axis=1)
         self.data = self.data.dropna(axis=0).asfreq('H')
-        
+    
     def __getitem__(self, idx: int):
         return self.data.iloc[idx]
 

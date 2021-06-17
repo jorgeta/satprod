@@ -71,7 +71,12 @@ def store_results(
     results.corr_train_preds = None
     results.train_targs = None
     
-    info = (model, results, train_config, data_config, scaler, target_label_indices)
+    info = (model, 
+            results, 
+            train_config, 
+            data_config, 
+            scaler, 
+            target_label_indices)
     with open(f'{path}/model_results_config.pickle', 'wb') as storage_file:
         pickle.dump(info, storage_file)
         
@@ -147,13 +152,14 @@ class ModelEvaluation():
         self.target_label_indices = target_label_indices
         self.wind_dataset = WindDataset(self.data_config)
         
-        self.results.corr_train_preds = loadtxt(f'{self.path}/corr_train_preds.csv', delimiter=',')
-        self.results.train_targs = loadtxt(f'{self.path}/train_targs.csv', delimiter=',')
-        
-        self.results.corr_train_preds = self.results.corr_train_preds.reshape(
-            -1, self.data_config.pred_sequence_length, len(self.target_label_indices))
-        self.results.train_targs = self.results.train_targs.reshape(
-            -1, self.data_config.pred_sequence_length, len(self.target_label_indices))
+        if results.corr_train_preds is None:
+            self.results.corr_train_preds = loadtxt(f'{self.path}/corr_train_preds.csv', delimiter=',')
+            self.results.train_targs = loadtxt(f'{self.path}/train_targs.csv', delimiter=',')
+            
+            self.results.corr_train_preds = self.results.corr_train_preds.reshape(
+                -1, self.data_config.pred_sequence_length, len(self.target_label_indices))
+            self.results.train_targs = self.results.train_targs.reshape(
+                -1, self.data_config.pred_sequence_length, len(self.target_label_indices))
     
     def info(self, to_console: bool=False):
         info_str = f'\nTimestamp: {self.timestamp}\nPark: {self.park}\nModel: {self.model_name}'

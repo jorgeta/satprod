@@ -62,6 +62,12 @@ def cos_transform(values):
 
     return np.cos(2*np.pi*values/360)
 
+def cos_temporal_transform(timeseries: [int]):
+    return np.cos(2*np.pi*timeseries/len(set(timeseries)))
+    
+def sin_temporal_transform(timeseries: [int]):
+    return np.sin(2*np.pi*timeseries/len(set(timeseries)))
+
 def scaler(arr, min_val: float=0.0, max_val: float=1.0):
     '''
     Scales the input array so that it has the desired minimum and maximum value.

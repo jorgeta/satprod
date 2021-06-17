@@ -66,7 +66,7 @@ def train_loop(net, train_config: TrainConfig, data_config: DataConfig, data: Wi
         train_config (TrainConfig): a dataclass containing parameters specific to training
         data_config (DataConfig): a dataclass containing which model and which features and splits to use
         data (WindDataset): the dataset structured to fit the model
-    
+
     Returns:
         best_model: the trained network with the lowest validation error
         results (Results): a dataclass containing results and predictions
