@@ -29,10 +29,7 @@ class ModelComparison():
                     raise Exception('The "model1" slot must be filled, as it is used as the main model of the comparison.')
                 continue
             value['park']=self.park
-            try:
-                self.eval_dict[key] = ModelEvaluation(**value)
-            except:
-                continue
+            self.eval_dict[key] = ModelEvaluation(**value)
         
         self.wind_dataset = self.eval_dict['model1'].wind_dataset
         self.pred_sequence_length = self.eval_dict['model1'].data_config.pred_sequence_length
