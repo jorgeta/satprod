@@ -63,13 +63,13 @@ comparison: # {'timestamp': , 'model_name': , 'sorting': 'num'}
     model3: {'timestamp': '2021-06-14-13-02', 'model_name': 'TCN', 'sorting': 'num'}
     model4: {'timestamp': '2021-06-15-21-27', 'model_name': 'TCN', 'sorting': 'num'}
     model5: 
-    model6: #{'timestamp': '2021-06-10-01-23', 'model_name': 'LSTM', 'sorting': 'img'}
-    model7: #{'timestamp': '2021-06-11-05-21', 'model_name': 'MLR', 'sorting': 'num'}
+    model6: 
+    model7: 
   bess:
     model1: {'timestamp': '2021-06-13-18-35', 'model_name': 'MLR', 'sorting': 'num'}
     model2: {'timestamp': '2021-06-17-16-56', 'model_name': 'TCN', 'sorting': 'num'}
-    model3: #{'timestamp': '2021-06-16-10-47', 'model_name': 'TCN', 'sorting': 'num'}
-    model4: #{'timestamp': '2021-06-16-12-22', 'model_name': 'TCN', 'sorting': 'num'}
+    model3: 
+    model4: 
     model5:
     model6:
   vals:

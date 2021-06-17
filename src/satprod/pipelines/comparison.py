@@ -19,7 +19,9 @@ class ModelComparison():
         self.config = config[park]
         
         self.TE_data_path = f'{self.root}/storage/{park}/TE'
-        self.comparison_storage_path = f'{self.root}/storage/{park}/comparison'
+        
+        timestamp = datetime.now().strftime('%Y-%m-%d-%H-%M')
+        self.comparison_storage_path = f'{self.root}/storage/{park}/comparison/{timestamp}'
         os.makedirs(self.comparison_storage_path, exist_ok=True)
         
         self.eval_dict = {}
@@ -29,7 +31,11 @@ class ModelComparison():
                     raise Exception('The "model1" slot must be filled, as it is used as the main model of the comparison.')
                 continue
             value['park']=self.park
-            self.eval_dict[key] = ModelEvaluation(**value)
+            try:
+                self.eval_dict[key] = ModelEvaluation(**value)
+            except:
+                logging.info(f'Unable to evaluate {value}.')
+                continue
         
         self.wind_dataset = self.eval_dict['model1'].wind_dataset
         self.pred_sequence_length = self.eval_dict['model1'].data_config.pred_sequence_length
