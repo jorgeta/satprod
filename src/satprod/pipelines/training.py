@@ -19,6 +19,7 @@ from satprod.ml.agru import AGRU
 from satprod.ml.tcn import TCN
 from satprod.ml.tcn_bai import TCN_Bai
 from satprod.ml.mlr import MLR
+from satprod.ml.simpleresnet import SimpleResNet
 
 from satprod.data_handlers.data_utils import get_columns
 from satprod.configs.job_configs import TrainConfig, DataConfig
@@ -565,6 +566,13 @@ def init_data_and_model(config):
         'pred_sequence_length': data_config.pred_sequence_length
     }
     
+    simpleresnetparams = {
+        'output_size': data_config.pred_sequence_length,
+        'num_output_features': wind_dataset.n_output_features,
+        'resnet_params' : resnet_params,
+        #'sequence_length' : 1,
+    }
+    
     if config.model=='TCN':
         net = TCN(**tcn_params)
     elif config.model=='LSTM':
@@ -573,6 +581,8 @@ def init_data_and_model(config):
         net = TCN_Bai(**tcn_bai_params)
     elif config.model=='MLR':
         net = MLR(**mlr_params)
+    elif config.model=='SimpleResNet':
+        net = SimpleResNet(**simpleresnetparams)
     else:
         raise Exception(f'The model "{config.model}" does not exist.')
     

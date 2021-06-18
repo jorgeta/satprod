@@ -1,13 +1,13 @@
 app: satprod
 
-model: 'TCN' #'LSTM', 'TCN', 'AGRU', 'TCN_Bai', 'MLR'
-train_on_one_batch: True
+model: 'SimpleResNet' #'SimpleResNet', 'LSTM', 'TCN', 'AGRU', 'TCN_Bai', 'MLR'
+train_on_one_batch: False
 
 data_config:
   parks: ['skom'] # ['bess', 'vals','skom','yvik']
   numerical_features: [] #['production', 'speed', 'direction', 'temporal']
   use_img_features: True
-  img_extraction_method: 'lenet' # 'lenet', 'deepsense', 'resnet'
+  img_extraction_method: 'resnet' # 'lenet', 'deepsense', 'resnet'
   
   pred_sequence_length: 5 # if changing, run 'satprod num update_formatted_files'
   use_numerical_forecasts: True
