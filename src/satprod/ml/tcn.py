@@ -116,7 +116,8 @@ class TCN(nn.Module):
             
             x_img = image_feature_extraction(x_img, self)
             
-            x = torch.cat([x, x_img], dim=2) if x is not None else x_img
+            if x is not None:
+                x = torch.cat([x, x_img], dim=2) if x is not None else x_img
         
         x = self.tcn_stack(x.transpose(1,2)).transpose(1, 2)
         

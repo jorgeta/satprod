@@ -19,7 +19,7 @@ data_config:
 
 train_config:
   batch_size: 16
-  num_epochs: 1
+  num_epochs: 100
   learning_rate: 1.0e-3
   scheduler_gamma: 0.9
   random_seed: 0
@@ -49,7 +49,7 @@ models:
     kernel_size: 3
     dilation_base: 2
     dropout: 0.2
-    only_predict_future_values: False
+    only_predict_future_values: True
   tcn_bai:
     channels: [32, 32, 32]
     kernel_size: 3

@@ -38,6 +38,8 @@ def train_model(config):
 
     Args:
         config (munch.Munch): the contents of 'config.yaml', located in the project root directory.
+    
+    レットウンス　ノチング
     """
     
     # initialize dataset and model based on the configuration dict

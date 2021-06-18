@@ -19,6 +19,8 @@ class TrainConfig():
         self.scheduler_step_size = int(0.9*self.num_epochs)
         if self.scheduler_step_size < 1:
             self.scheduler_step_size = 1
+        else:
+            self.scheduler_step_size = 5
 
 @dataclass
 class DataConfig():
