@@ -501,7 +501,8 @@ def init_data_and_model(config):
     }
     
     resnet_params = {
-        'output_size' : config.img_extraction_methods.resnet.output_size
+        'output_size' : config.img_extraction_methods.resnet.output_size,
+        'freeze_all_but_last_layer' : config.img_extraction_methods.resnet.freeze_all_but_last_layer
     }
     
     deepsense_params = {
@@ -516,6 +517,7 @@ def init_data_and_model(config):
         'num_layers' : config.models.lstm.num_layers,
         'input_size' : wind_dataset.n_past_features,
         'num_forecast_features' : wind_dataset.n_forecast_features,
+        'num_img_forecast_features' : wind_dataset.n_img_forecast_features,
         'num_output_features' : wind_dataset.n_output_features,
         'output_size' : data_config.pred_sequence_length,
         'img_extraction_method': data_config.img_extraction_method,

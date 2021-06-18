@@ -11,7 +11,7 @@ data_config:
   
   pred_sequence_length: 5 # if changing, run 'satprod num update_formatted_files'
   use_numerical_forecasts: True
-  use_img_forecasts: True
+  use_img_forecasts: False
   
   valid_start: {'year': 2019, 'month': 5, 'day': 12, 'hour': 0}
   test_start: {'year': 2020, 'month': 5, 'day': 12, 'hour': 0}
@@ -19,7 +19,7 @@ data_config:
 
 train_config:
   batch_size: 64
-  num_epochs: 50
+  num_epochs: 1
   learning_rate: 4.0e-3
   scheduler_gamma: 0.9
   random_seed: 0
@@ -35,6 +35,7 @@ img_extraction_methods:
     padding_pool: [0, 0]
   resnet:
     output_size: 32
+    freeze_all_but_last_layer: False
 
 models:
   lstm:
@@ -44,7 +45,7 @@ models:
     num_layers: 1
     dropout: 0.2
   tcn:
-    channels: [32, 32]
+    channels: [32]
     kernel_size: 3
     dilation_base: 2
     dropout: 0.2

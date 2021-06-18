@@ -119,14 +119,17 @@ class LeNet(nn.Module):
 
 class ResNet(nn.Module):
     
-    def __init__(self, output_size):
+    def __init__(self, output_size, freeze_all_but_last_layer: bool):
         super(ResNet, self).__init__()
         self.name = 'ResNet'
+        self.freeze_all_but_last_layer = freeze_all_but_last_layer
         self.resnet18 = resnet18(pretrained=True)
-        for param in self.resnet18.parameters():
-            param.requires_grad = False
+        self.output_size = output_size
+        if self.freeze_all_but_last_layer:
+            for param in self.resnet18.parameters():
+                param.requires_grad = False
         n_features = self.resnet18.fc.in_features
-        self.resnet18.fc = nn.Linear(n_features, output_size)
+        self.resnet18.fc = nn.Linear(n_features, self.output_size)
         
         self.normalize = Normalize(
             mean=[0.485, 0.456, 0.406],

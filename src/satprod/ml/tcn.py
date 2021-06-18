@@ -88,24 +88,24 @@ class TCN(nn.Module):
         
         x = None
         if x_prod is not None:
-            if x_weather_forecasts is not None:
-                x_weather_forecasts = pad(x_weather_forecasts, (0, self.output_size))
-            
             if x_weather is not None:
                 x = torch.cat([x_weather, x_prod], dim=2)
+                if x_weather_forecasts is not None:
+                    x_weather_forecasts = pad(x_weather_forecasts, (0, self.output_size))
+                    x = torch.cat([x, x_weather_forecasts], dim=1)
+            else:
+                x = x_prod
         else:
             if x_weather is not None:
                 x = x_weather
-                
                 if x_weather_forecasts is not None:
                     x = torch.cat([x, x_weather_forecasts], dim=1)
         if x is not None:
             x = x[:, self.pred_sequence_length:, :]
             self.batch_size = x.shape[0]
         else:
-            assert x_img is not None, 'Logical error: There is no data to train on.'
+            assert x_img is not None, 'Feature error: The dataset is empty.'
         # x shape: (batch_size, sequence_length, n_features) (64, 29, 4)
-        
         
         if x_img is not None:
             assert x_img_forecasts is not None, 'The model requires image forecasts when images are used.'

@@ -117,6 +117,7 @@ class WindDataset(torch.utils.data.Dataset):
         # some useful measurements
         self.n_image_features = len(self.img_features)
         self.n_forecast_features = len(get_columns(self.num_data, '+').columns)
+        self.n_img_forecast_features = len(get_columns(img_data, '+').columns)
         #self.n_unique_forecast_features = len(get_columns(self.num_data, '+1h').columns)
         self.n_past_features = len(self.num_data.columns)-self.n_forecast_features
         self.n_output_features = len(self.target_labels)
