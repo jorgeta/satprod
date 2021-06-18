@@ -133,13 +133,13 @@ def train_loop(net, train_config: TrainConfig, data_config: DataConfig, data: Wi
     num_batches_test = num_samples_test // batch_size
     
     if train_config.train_on_one_batch:
-        num_batches_train = 1
+        num_batches_train = 2
         train_indices = train_indices[:(num_batches_train+1)*batch_size]
         num_samples_train = len(train_indices)
-        num_batches_valid = 1
+        num_batches_valid = 2
         valid_indices = valid_indices[:(num_batches_valid+1)*batch_size]
         num_samples_valid = len(valid_indices)
-        num_batches_test = 1
+        num_batches_test = 2
         test_indices = test_indices[:(num_batches_test+1)*batch_size]
         num_samples_test = len(test_indices)
     

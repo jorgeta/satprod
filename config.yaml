@@ -18,9 +18,9 @@ data_config:
   test_end: {'year': 2021, 'month': 5, 'day': 11, 'hour': 23}
 
 train_config:
-  batch_size: 64
+  batch_size: 16
   num_epochs: 1
-  learning_rate: 4.0e-3
+  learning_rate: 1.0e-3
   scheduler_gamma: 0.9
   random_seed: 0
 
