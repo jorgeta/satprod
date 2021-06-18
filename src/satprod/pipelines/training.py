@@ -127,6 +127,7 @@ def train_loop(net, train_config: TrainConfig, data_config: DataConfig, data: Wi
         test_targs = [],
         test_mae = np.inf
     )
+    lowest_train_mae = np.inf
     
     num_samples_train = len(train_indices)
     num_batches_train = num_samples_train // batch_size
@@ -280,6 +281,13 @@ def train_loop(net, train_config: TrainConfig, data_config: DataConfig, data: Wi
             
             with open(f'{path}/best_model_{now}.pickle', 'wb') as model_file:
                 pickle.dump(net, model_file)
+        
+        if train_mae_cur < lowest_train_mae:
+            lowest_train_mae = train_mae_cur
+            results.corr_train_mae = train_mae_cur
+            results.corr_train_preds = train_preds
+            results.train_targs = train_targs
+            
         
         scheduler.step()
         
