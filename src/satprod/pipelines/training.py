@@ -309,6 +309,9 @@ def train_loop(net, train_config: TrainConfig, data_config: DataConfig, data: Wi
             current_batch_size = data_dict['X_img'].shape[0]
         else:
             current_batch_size = data_dict['X_prod'].shape[0]
+            
+        if 'production' not in data_config.numerical_features:
+            data_dict['X_prod'] = None
         
         output = best_model(data_dict)[:, -pred_sequence_length:, :]
         
