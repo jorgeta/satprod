@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from torch import nn
 from torch.nn.functional import pad
-from satprod.ml.imgnets import LeNet, ResNet, DeepSense, image_feature_extraction
+from satprod.ml.imgnets import LeNet, ResNet, VGG, image_feature_extraction
 from collections import OrderedDict
 from torch.nn.utils import weight_norm
 
@@ -10,7 +10,6 @@ class TCN(nn.Module):
     
     def __init__(self,
                 num_past_features: int,
-                #num_forecast_features: int, 
                 output_size: int,
                 pred_sequence_length: int = 5,
                 kernel_size: int = 3,
@@ -18,7 +17,7 @@ class TCN(nn.Module):
                 channels: [int] = [10, 10, 10],
                 resnet_params: dict=None,
                 lenet_params: dict=None,
-                deepsense_params: dict=None,
+                vgg_params: dict=None,
                 img_extraction_method: str=None,
                 dropout: float=0.0,
                 only_predict_future_values: bool=False
@@ -32,7 +31,6 @@ class TCN(nn.Module):
         self.img_extraction_method = img_extraction_method
         self.channels = channels
         self.num_past_features = num_past_features
-        #self.num_forecast_features = num_forecast_features
         self.num_image_features = 0
         self.dropout = dropout
         self.only_predict_future_values = only_predict_future_values
@@ -44,12 +42,11 @@ class TCN(nn.Module):
         elif self.img_extraction_method=='resnet':
             self.resnet = ResNet(**resnet_params)
             self.num_image_features = resnet_params['output_size']
-        elif img_extraction_method=='deepsense':
-            raise NotImplementedError
-            self.deepsense = DeepSense(**deepsense_params)
-            self.num_image_features = 0
+        elif img_extraction_method=='vgg':
+            self.vgg = VGG(**vgg_params)
+            self.num_image_features = vgg_params['output_size']
         else:
-            pass
+            raise NotImplementedError
         
         self.dilation_base = dilation_base
         assert self.kernel_size >= self.dilation_base

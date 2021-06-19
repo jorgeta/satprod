@@ -15,11 +15,10 @@ import pickle
 from satprod.pipelines.dataset import WindDataset
 
 from satprod.ml.lstm import LSTM
-from satprod.ml.agru import AGRU
 from satprod.ml.tcn import TCN
 from satprod.ml.tcn_bai import TCN_Bai
 from satprod.ml.mlr import MLR
-from satprod.ml.simpleresnet import SimpleResNet
+from satprod.ml.sin import SIN
 
 from satprod.data_handlers.data_utils import get_columns
 from satprod.configs.job_configs import TrainConfig, DataConfig
@@ -382,10 +381,11 @@ def get_sequenced_data(
             
             image_sequence = []
             img_indices = np.ravel(img_data[data_config.img_features].values)
+            
             for index in img_indices:
                 image_sequence.append(data.img_datasets[data_config.img_features[0]][index].img)
-                
-            img_data = torch.from_numpy(np.array(image_sequence))
+            
+            img_data = torch.stack(image_sequence)
             
             # add to array
             input_img_array.append(img_data)
@@ -401,7 +401,7 @@ def get_sequenced_data(
                 for index in img_indices:
                     image_sequence.append(data.img_datasets[data_config.img_features[0]][index].img)
                 
-                img_forecast_data = torch.from_numpy(np.array(image_sequence))
+                img_forecast_data = torch.stack(image_sequence)
                 
                 # add to array
                 forecast_img_array.append(img_forecast_data)
@@ -413,6 +413,7 @@ def get_sequenced_data(
                 forecast_data.append(get_columns(input_data, f'+{i+1}h').iloc[-1].values)
             
             input_data = input_data.drop(columns=get_columns(input_data, '+').columns)
+            
             forecast_data = torch.from_numpy(np.array(forecast_data))
             
             # add to array
@@ -519,8 +520,9 @@ def init_data_and_model(config):
         'freeze_all_but_last_layer' : config.img_extraction_methods.resnet.freeze_all_but_last_layer
     }
     
-    deepsense_params = {
-        
+    vgg_params = {
+        'output_size' : config.img_extraction_methods.vgg.output_size,
+        'freeze_all_but_last_layer' : config.img_extraction_methods.vgg.freeze_all_but_last_layer
     }
     
     # define model structure
@@ -537,13 +539,12 @@ def init_data_and_model(config):
         'img_extraction_method': data_config.img_extraction_method,
         'lenet_params' : lenet_params,
         'resnet_params' : resnet_params,
-        'deepsense_params' : deepsense_params,
+        'vgg_params' : vgg_params,
         'dropout': config.models.lstm.dropout
     }
     
     tcn_params = {
         'num_past_features': wind_dataset.n_past_features,
-        #'num_forecast_features': wind_dataset.n_forecast_features,
         'output_size': wind_dataset.n_output_features,
         'channels': config.models.tcn.channels,
         'kernel_size': config.models.tcn.kernel_size,
@@ -552,7 +553,7 @@ def init_data_and_model(config):
         'img_extraction_method': data_config.img_extraction_method,
         'lenet_params' : lenet_params,
         'resnet_params' : resnet_params,
-        'deepsense_params' : deepsense_params,
+        'vgg_params' : vgg_params,
         'dropout': config.models.tcn.dropout,
         'only_predict_future_values': config.models.tcn.only_predict_future_values
     }
@@ -574,11 +575,15 @@ def init_data_and_model(config):
         'pred_sequence_length': data_config.pred_sequence_length
     }
     
-    simpleresnetparams = {
+    sin_params = {
         'output_size': data_config.pred_sequence_length,
         'num_output_features': wind_dataset.n_output_features,
+        'img_extraction_method': data_config.img_extraction_method,
+        'lenet_params' : lenet_params,
         'resnet_params' : resnet_params,
-        #'sequence_length' : 1,
+        'vgg_params' : vgg_params,
+        'dropout' : config.models.sin.dropout,
+        'sequence_length' : config.models.sin.sequence_length
     }
     
     if config.model=='TCN':
@@ -589,8 +594,8 @@ def init_data_and_model(config):
         net = TCN_Bai(**tcn_bai_params)
     elif config.model=='MLR':
         net = MLR(**mlr_params)
-    elif config.model=='SimpleResNet':
-        net = SimpleResNet(**simpleresnetparams)
+    elif config.model=='SIN':
+        net = SIN(**sin_params)
     else:
         raise Exception(f'The model "{config.model}" does not exist.')
     

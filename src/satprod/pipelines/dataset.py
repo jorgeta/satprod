@@ -91,7 +91,7 @@ class WindDataset(torch.utils.data.Dataset):
             if col not in self.img_features:
                 img_data = img_data.drop(columns=[col])
             else:
-                if self.img_extraction_method=='resnet':
+                if self.img_extraction_method=='resnet' or self.img_extraction_method=='vgg':
                     self.img_datasets[col] = ImgDataset(ImgType(col), normalize=True, upscale=True) #[62, 12, 224, 224, 3]
                 else:
                     self.img_datasets[col] = ImgDataset(ImgType(col), normalize=True, grayscale=True)

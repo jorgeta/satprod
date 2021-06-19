@@ -168,6 +168,11 @@ class ImgDataset(torch.utils.data.Dataset):
             img = img/255.0
         if self.upscale: 
             img = cv2.resize(img, (224, 224), interpolation = cv2.INTER_AREA)
+            nrmlz = transforms.Normalize(
+                mean=[0.485, 0.456, 0.406],
+                std=[0.229, 0.224, 0.225]
+            )
+            img = nrmlz(torch.from_numpy(img))
         
         date = self.timestamps[idx]
         
@@ -188,5 +193,5 @@ class ImgDataset(torch.utils.data.Dataset):
             return np.nan
 
 if __name__=='__main__':
-    data = ImgDataset(ImgType('sat'))
-    print(len(data))
+    data = ImgDataset(ImgType('grid'), normalize=True, upscale=True)
+    print(data[0].img.shape)

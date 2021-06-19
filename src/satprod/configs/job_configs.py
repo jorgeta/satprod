@@ -59,3 +59,5 @@ class DataConfig():
             self.img_extraction_method = None
             self.use_img_forecasts = False
             
+        if len(self.numerical_features) < 1:
+            self.use_numerical_forecasts = False

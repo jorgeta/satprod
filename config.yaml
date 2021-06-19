@@ -1,13 +1,13 @@
 app: satprod
 
-model: 'SimpleResNet' #'SimpleResNet', 'LSTM', 'TCN', 'AGRU', 'TCN_Bai', 'MLR'
-train_on_one_batch: False
+model: 'SIN' #'SIN', 'LSTM', 'TCN', 'TCN_Bai', 'MLR'
+train_on_one_batch: True
 
 data_config:
   parks: ['skom'] # ['bess', 'vals','skom','yvik']
   numerical_features: [] #['production', 'speed', 'direction', 'temporal']
   use_img_features: True
-  img_extraction_method: 'resnet' # 'lenet', 'deepsense', 'resnet'
+  img_extraction_method: 'vgg' # 'lenet', 'resnet', 'vgg'
   
   pred_sequence_length: 5 # if changing, run 'satprod num update_formatted_files'
   use_numerical_forecasts: True
@@ -19,7 +19,7 @@ data_config:
 
 train_config:
   batch_size: 16
-  num_epochs: 100
+  num_epochs: 20
   learning_rate: 1.0e-3
   scheduler_gamma: 0.9
   random_seed: 0
@@ -36,6 +36,9 @@ img_extraction_methods:
   resnet:
     output_size: 32
     freeze_all_but_last_layer: False
+  vgg:
+    output_size: 256
+    freeze_all_but_last_layer: True
 
 models:
   lstm:
@@ -56,6 +59,9 @@ models:
     dropout: 0.0
   mlr:
     sequence_length: 3
+  sin:
+    dropout: 0.0
+    sequence_length: 1
 
 comparison: # {'timestamp': , 'model_name': , 'sorting': 'num'}
   skom: 
@@ -63,7 +69,7 @@ comparison: # {'timestamp': , 'model_name': , 'sorting': 'num'}
     model2: {'timestamp': '2021-06-14-02-03', 'model_name': 'LSTM', 'sorting': 'num'}
     model3: {'timestamp': '2021-06-14-13-02', 'model_name': 'TCN', 'sorting': 'num'}
     model4: {'timestamp': '2021-06-15-21-27', 'model_name': 'TCN', 'sorting': 'num'}
-    model5: 
+    model5: {'timestamp': '2021-06-19-02-42', 'model_name': 'SRN', 'sorting': 'img'}
     model6: 
     model7: 
   bess:

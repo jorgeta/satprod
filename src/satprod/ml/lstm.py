@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 from torch import nn
-from satprod.ml.imgnets import LeNet, ResNet, DeepSense, image_feature_extraction
+from satprod.ml.imgnets import LeNet, ResNet, image_feature_extraction
 
 class LSTM(nn.Module):
     
@@ -41,11 +41,11 @@ class LSTM(nn.Module):
         elif self.img_extraction_method=='resnet':
             self.resnet = ResNet(**resnet_params)
             self.num_image_features = resnet_params['output_size']
-        elif img_extraction_method=='deepsense':
-            self.deepsense = DeepSense(**deepsense_params)
-            self.num_image_features = 0
+        elif img_extraction_method=='vgg':
+            self.vgg = VGG(**vgg_params)
+            self.num_image_features = vgg_params['output_size']
         else:
-            pass
+            raise NotImplementedError
         
         self.dropout = nn.Dropout(dropout)
         

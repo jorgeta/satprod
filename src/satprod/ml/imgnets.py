@@ -1,8 +1,47 @@
 import numpy as np
 import torch
 from torch import nn
-from torchvision.models import resnet18
+from torchvision.models import resnet18, vgg19
+from torchvision import transforms
 from torchvision.transforms import Normalize
+
+class ResNet(nn.Module):
+    
+    def __init__(self, output_size, freeze_all_but_last_layer: bool):
+        super(ResNet, self).__init__()
+        self.name = 'ResNet'
+        self.freeze_all_but_last_layer = freeze_all_but_last_layer
+        self.resnet18 = resnet18(pretrained=True)
+        self.output_size = output_size
+        if self.freeze_all_but_last_layer:
+            for param in self.resnet18.parameters():
+                param.requires_grad = False
+        n_features = self.resnet18.fc.in_features
+        self.resnet18.fc = nn.Linear(n_features, self.output_size)
+        
+    def forward(self, x_img):
+        return self.resnet18(x_img.view(-1, 3, 224, 224))
+
+class VGG(nn.Module):
+    
+    def __init__(self, output_size, freeze_all_but_last_layer: bool):
+        super(VGG, self).__init__()
+        self.name = 'VGG'
+        self.freeze_all_but_last_layer = freeze_all_but_last_layer
+        self.vgg19 = vgg19(pretrained=True).features
+        self.output_size = output_size
+        if self.freeze_all_but_last_layer:
+            for param in self.vgg19.parameters():
+                param.requires_grad = False
+        n_features = 25088 # form vgg classifier part, that is not included here
+        #m1: [39424 x 7], m2: [25088 x 32]
+        
+        self.linear = nn.Linear(n_features, self.output_size)
+    
+    def forward(self, x_img):
+        self.batch_size = x_img.shape[0]
+        x = self.vgg19(x_img.view(-1, 3, 224, 224))
+        return self.linear(x.view(self.batch_size, -1))
 
 class LeNet(nn.Module):
     
@@ -117,37 +156,6 @@ class LeNet(nn.Module):
         
         return x_img.squeeze()
 
-class ResNet(nn.Module):
-    
-    def __init__(self, output_size, freeze_all_but_last_layer: bool):
-        super(ResNet, self).__init__()
-        self.name = 'ResNet'
-        self.freeze_all_but_last_layer = freeze_all_but_last_layer
-        self.resnet18 = resnet18(pretrained=True)
-        self.output_size = output_size
-        if self.freeze_all_but_last_layer:
-            for param in self.resnet18.parameters():
-                param.requires_grad = False
-        n_features = self.resnet18.fc.in_features
-        self.resnet18.fc = nn.Linear(n_features, self.output_size)
-        
-        self.normalize = Normalize(
-            mean=[0.485, 0.456, 0.406],
-            std=[0.229, 0.224, 0.225]
-        )
-        
-    def forward(self, x_img):
-        x_img = x_img.view(-1, 3, 224, 224)
-        x_img = self.normalize(x_img)
-        return self.resnet18(x_img)
-
-class DeepSense(nn.Module):
-    def __init__(self):
-        super(DeepSense, self).__init__()
-        self.name = 'DeepSense'
-        
-        raise NotImplementedError
-
 def image_feature_extraction(x_img, net):
     if net.img_extraction_method=='lenet':
         x_img_features = []
@@ -162,7 +170,12 @@ def image_feature_extraction(x_img, net):
             img = x_img[:, i, :, :, :]
             img = net.resnet(img)
             x_img_features.append(img)
-    
+    elif net.img_extraction_method=='vgg':
+        x_img_features = []
+        for i in range(x_img.shape[1]):
+            img = x_img[:, i, :, :, :]
+            img = net.vgg(img)
+            x_img_features.append(img)
     else:
         raise NotImplementedError()
 
