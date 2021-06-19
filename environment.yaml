@@ -1,7 +1,7 @@
 name: satprod
 
 dependencies:
-  - conda=4.9.2
+  - conda=4.10.1
   - pip=21.0.1
   - python=3.7.2
   #- opencv=3.4.2
@@ -12,10 +12,10 @@ dependencies:
     - pytest==6.2.2
     - jupyter==1.0.0
     - scikit-learn==0.24.1
-    #- torch==1.7.1
-    #- torchvision==0.8.2
-    - torch==0.4.1
-    - torchvision==0.2.1
+    - torch==1.7.1
+    - torchvision==0.8.2
+    #- torch==0.4.1
+    #- torchvision==0.2.1
     - matplotlib==3.3.4
     - statsmodels==0.12.2
     - seaborn==0.11.1

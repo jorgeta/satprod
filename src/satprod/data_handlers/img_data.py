@@ -1,4 +1,3 @@
-import numpy as np
 import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 import os
@@ -7,7 +6,7 @@ import torch
 import torchvision
 import torch.utils.data
 from torchvision import transforms
-
+import numpy as np
 import cv2
 
 from satprod.data_handlers.data_utils import datetime2path, path2datetime
@@ -168,6 +167,7 @@ class ImgDataset(torch.utils.data.Dataset):
             img = img/255.0
         if self.upscale: 
             img = cv2.resize(img, (224, 224), interpolation = cv2.INTER_AREA)
+            img = np.transpose(img, (2, 0, 1))
             nrmlz = transforms.Normalize(
                 mean=[0.485, 0.456, 0.406],
                 std=[0.229, 0.224, 0.225]
