@@ -40,6 +40,8 @@ class SIN(nn.Module):
         )
         
         self.dropout = nn.Dropout(dropout)
+        
+        self.relu = nn.ReLU()
     
     def forward(self, data_dict: dict):
         x_img = data_dict['X_img']
@@ -51,7 +53,7 @@ class SIN(nn.Module):
         
         x = x.view(self.batch_size, self.num_image_features*self.sequence_length)
         
-        x = self.linear(self.dropout(x))
+        x = self.linear(self.dropout(self.relu(x)))
         
         x = x.view(self.batch_size, self.output_size, self.num_output_features)
         # x.shape: (batch_size, output_size, num_output_features)

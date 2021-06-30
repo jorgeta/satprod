@@ -19,7 +19,7 @@ data_config:
 
 train_config:
   batch_size: 16
-  num_epochs: 1
+  num_epochs: 20
   learning_rate: 1.0e-3
   scheduler_gamma: 0.9
   random_seed: 0
