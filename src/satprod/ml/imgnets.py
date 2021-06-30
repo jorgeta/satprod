@@ -18,7 +18,7 @@ class ResNet(nn.Module):
                 param.requires_grad = False
         n_features = self.resnet18.fc.in_features
         self.resnet18.fc = nn.Linear(n_features, self.output_size)
-        
+    
     def forward(self, x_img):
         return self.resnet18(x_img.view(-1, 3, 224, 224))
 
@@ -34,7 +34,6 @@ class VGG(nn.Module):
             for param in self.vgg19.parameters():
                 param.requires_grad = False
         n_features = 25088 # form vgg classifier part, that is not included here
-        #m1: [39424 x 7], m2: [25088 x 32]
         
         self.linear = nn.Linear(n_features, self.output_size)
     
@@ -58,8 +57,8 @@ class LeNet(nn.Module):
                 ):
         super(LeNet, self).__init__()
         
-        assert height>0
-        assert width>0
+        assert height > 0
+        assert width > 0
         assert len(channels)==3
         
         self.name = 'LeNet'

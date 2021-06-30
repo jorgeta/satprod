@@ -4,7 +4,7 @@ model: 'SIN' #'SIN', 'LSTM', 'TCN', 'TCN_Bai', 'MLR'
 train_on_one_batch: True
 
 data_config:
-  parks: ['skom'] # ['bess', 'vals','skom','yvik']
+  parks: ['vals'] # ['bess', 'vals','skom','yvik']
   numerical_features: [] #['production', 'speed', 'direction', 'temporal']
   use_img_features: True
   img_extraction_method: 'vgg' # 'lenet', 'resnet', 'vgg'
@@ -60,7 +60,7 @@ models:
   mlr:
     sequence_length: 3
   sin:
-    dropout: 0.0
+    dropout: 0.1
     sequence_length: 1
 
 comparison: # {'timestamp': , 'model_name': , 'sorting': 'num'}
