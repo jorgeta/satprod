@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 import cv2
 import logging
 import pandas as pd
+import numpy as np
 
 from satprod.configs.config_utils import read_yaml, TimeInterval, ImgType, structurize_wind_grid_images
 from satprod.data_handlers.img_data import Img, ImgDataset, SatImg, FlowImg
@@ -37,8 +38,48 @@ class App:
         
         self.num = NumericalDataHandler()
         
-    def train(self):
-        train_model(self.config)
+    def train(self, parameter_tuning: bool=False, feature_selection: bool=False):
+        if feature_selection:
+            
+            numerical_feature_combinations = [
+                ['production'],
+                ['production', 'speed'],
+                ['production', 'speed', 'direction'],
+                ['production', 'speed', 'direction', 'temporal'],
+                ['speed'],
+                ['speed', 'direction']
+                ['speed', 'direction', 'temporal']
+            ]
+            
+            for numerical_features in numerical_feature_combinations:
+                self.config.data_config.numerical_features = numerical_features
+            
+        if parameter_tuning:
+            if self.config.model == 'TCN':
+                channel_combinations = [
+                    [32, 32, 32],
+                    [32, 32], 
+                    [32],
+                ]
+                kernel_combinations = [
+                    {'kernel_size': 3, 'dilation_base': 2},
+                    {'kernel_size': 4, 'dilation_base': 2}
+                ]
+                dropout_combinations = [
+                    0.1, 0.2, 0.3, 0.4, 0.5
+                ]
+                for channels in channel_combinations:
+                    for kernel in kernel_combinations:
+                        for dropout in dropout_combinations:
+                            self.config.models.tcn.channels = channels
+                            self.config.models.tcn.kernel_size = kernel['kernel_size']
+                            self.config.models.tcn.dilation_base = kernel['dilation_base']
+                            self.config.models.tcn.dropout = dropout
+                            
+                            train_model(self.config)
+            
+        if not parameter_tuning and not feature_selection:
+            train_model(self.config)
         
     def evaluate(self):
         model_name = 'TCN'

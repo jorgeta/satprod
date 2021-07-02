@@ -45,8 +45,6 @@ class TCN(nn.Module):
         elif img_extraction_method=='vgg':
             self.vgg = VGG(**vgg_params)
             self.num_image_features = vgg_params['output_size']
-        else:
-            raise NotImplementedError
         
         self.dilation_base = dilation_base
         assert self.kernel_size >= self.dilation_base
