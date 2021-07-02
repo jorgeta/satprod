@@ -48,10 +48,10 @@ models:
     num_layers: 1
     dropout: 0.2
   tcn:
-    channels: [32]
-    kernel_size: 3
-    dilation_base: 2
-    dropout: 0.2
+    channels: [32, 32] # 1-4
+    kernel_size: 3 # 3-5
+    dilation_base: 2 # 1-2
+    dropout: 0.2 # 0-0.1-0.5
     only_predict_future_values: True
   tcn_bai:
     channels: [32, 32, 32]
