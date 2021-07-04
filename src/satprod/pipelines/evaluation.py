@@ -174,6 +174,8 @@ class ModelEvaluation():
                 info_str += f'\n{key}: {value}'
         for key, value in vars(self.train_config).items():
             info_str += f'\n{key}: {value}'
+        for key, value in vars(self.data_config).items():
+            info_str += f'\n{key}: {value}'
         
         info_str += f'\nTrain MAEs:\n{self.train_error_matrix}'
         info_str += f'\nValid MAEs:\n{self.valid_error_matrix}'
