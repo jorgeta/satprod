@@ -1,7 +1,7 @@
 app: satprod
 
 model: 'SIN' #'SIN', 'LSTM', 'TCN', 'TCN_Bai', 'MLR'
-train_on_one_batch: False
+train_on_one_batch: True
 
 data_config:
   parks: ['vals'] # ['bess', 'vals','skom','yvik']
@@ -12,6 +12,7 @@ data_config:
   pred_sequence_length: 5 # if changing, run 'satprod num update_formatted_files'
   use_numerical_forecasts: True
   use_img_forecasts: False
+  crop_image: True
   
   valid_start: {'year': 2019, 'month': 5, 'day': 12, 'hour': 0}
   test_start: {'year': 2020, 'month': 5, 'day': 12, 'hour': 0}

@@ -21,6 +21,7 @@ class WindDataset(torch.utils.data.Dataset):
         self.root = f'{cd}/../../..'
         
         self.img_extraction_method = data_config.img_extraction_method
+        self.crop_image = data_config.crop_image
         self.parks = data_config.parks
         self.numerical_features = data_config.numerical_features
         self.use_numerical_forecasts = data_config.use_numerical_forecasts
@@ -92,9 +93,9 @@ class WindDataset(torch.utils.data.Dataset):
                 img_data = img_data.drop(columns=[col])
             else:
                 if self.img_extraction_method=='resnet' or self.img_extraction_method=='vgg':
-                    self.img_datasets[col] = ImgDataset(ImgType(col), normalize=True, upscale=True) #[62, 12, 224, 224, 3]
+                    self.img_datasets[col] = ImgDataset(ImgType(col), normalize=True, upscale=True, crop=self.crop_image) #[62, 12, 224, 224, 3]
                 else:
-                    self.img_datasets[col] = ImgDataset(ImgType(col), normalize=True, grayscale=True)
+                    self.img_datasets[col] = ImgDataset(ImgType(col), normalize=True, grayscale=True, crop=self.crop_image)
         
         if self.use_img_forecasts:
             for col in img_data.columns:

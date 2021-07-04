@@ -41,6 +41,7 @@ class DataConfig():
     pred_sequence_length: int = 5
     use_numerical_forecasts: bool = True
     use_img_forecasts: bool = False
+    crop_image: bool = False
     
     def __post_init__(self):
         self.img_features = ['grid'] if self.use_img_features else []

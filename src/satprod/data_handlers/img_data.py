@@ -126,13 +126,19 @@ class ImgDataset(torch.utils.data.Dataset):
     information on the time they were taken.
     '''
     
-    def __init__(self, imgType: ImgType, normalize: bool=False, upscale: bool=False, grayscale: bool=False):
+    def __init__(self, 
+                imgType: ImgType, 
+                normalize: bool=False, 
+                upscale: bool=False, 
+                grayscale: bool=False,
+                crop: bool=True):
         cd = str(os.path.dirname(os.path.abspath(__file__)))
         self.root = f'{cd}/../../..'
 
         self.upscale = upscale
         self.normalize = normalize
         self.grayscale = grayscale
+        self.crop = crop
         
         self.imgType = imgType
         if self.imgType==ImgType.GRID:
@@ -163,6 +169,8 @@ class ImgDataset(torch.utils.data.Dataset):
             img = cv2.imread(self.img_paths[idx], 0)
         else:
             img = cv2.imread(self.img_paths[idx], 1)
+        if self.crop:
+            img = img[20:60, 30:70, :]
         if self.normalize:
             img = img/255.0
         if self.upscale: 

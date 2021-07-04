@@ -260,8 +260,25 @@ def train_loop(net, train_config: TrainConfig, data_config: DataConfig, data: Wi
             val_targs += list(data_dict['y_prod'].data.cpu().numpy())
             val_preds += list(output.data.cpu().numpy())
         
-        train_mae_cur = mean_absolute_error(np.ravel(train_targs), np.ravel(train_preds))
-        valid_mae_cur = mean_absolute_error(np.ravel(val_targs), np.ravel(val_preds))
+        def fill_nans_and_clip_infs(arr):
+            '''Fills in invalid values in an array if required at runtime.
+            '''
+            arr = np.nan_to_num(arr, nan=0.0, posinf=0.0, neginf=0.0)
+            return arr
+        
+        try:
+            train_mae_cur = mean_absolute_error(np.ravel(train_targs), np.ravel(train_preds))
+            valid_mae_cur = mean_absolute_error(np.ravel(val_targs), np.ravel(val_preds))
+        except:
+            logging.warning('Predictions included invalid values. Fixed with forward fill.')
+            
+            train_targs = fill_nans_and_clip_infs(train_targs)
+            train_preds = fill_nans_and_clip_infs(train_preds)
+            val_targs = fill_nans_and_clip_infs(val_targs)
+            val_preds = fill_nans_and_clip_infs(val_preds)
+            
+            train_mae_cur = mean_absolute_error(np.ravel(train_targs), np.ravel(train_preds))
+            valid_mae_cur = mean_absolute_error(np.ravel(val_targs), np.ravel(val_preds))
         
         results.train_mae.append(train_mae_cur)
         results.valid_mae.append(valid_mae_cur)
@@ -492,6 +509,7 @@ def init_data_and_model(config):
         pred_sequence_length = config.data_config.pred_sequence_length,
         use_numerical_forecasts = config.data_config.use_numerical_forecasts,
         use_img_forecasts = config.data_config.use_img_forecasts,
+        crop_image = config.data_config.crop_image,
         valid_start = config.data_config.valid_start,
         test_start = config.data_config.test_start,
         test_end = config.data_config.test_end
