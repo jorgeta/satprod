@@ -89,7 +89,8 @@ class TCN(nn.Module):
                     x_weather_forecasts = pad(x_weather_forecasts, (0, self.output_size))
                     x = torch.cat([x, x_weather_forecasts], dim=1)
             else:
-                x = x_prod
+                self.batch_size = x_prod.shape[0]
+                x = torch.cat([x_prod, torch.zeros(self.batch_size, self.pred_sequence_length, self.output_size)], dim=1)
         else:
             if x_weather is not None:
                 x = x_weather
@@ -108,9 +109,7 @@ class TCN(nn.Module):
             
             x_img = torch.cat([x_img, x_img_forecasts], dim=1)
             x_img = x_img[:, self.pred_sequence_length:, :]
-            
             x_img = image_feature_extraction(x_img, self)
-            
             if x is not None:
                 x = torch.cat([x, x_img], dim=2)
             else: 
