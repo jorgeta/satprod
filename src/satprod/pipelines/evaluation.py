@@ -159,9 +159,12 @@ class ModelEvaluation():
         
         if results.corr_train_preds is None:
             self.results.corr_train_preds = loadtxt(f'{self.path}/corr_train_preds.csv', delimiter=',')
+            self.results.train_preds = loadtxt(f'{self.path}/train_preds.csv', delimiter=',')
             self.results.train_targs = loadtxt(f'{self.path}/train_targs.csv', delimiter=',')
             
             self.results.corr_train_preds = self.results.corr_train_preds.reshape(
+                -1, self.data_config.pred_sequence_length, len(self.target_label_indices))
+            self.results.train_preds = self.results.train_preds.reshape(
                 -1, self.data_config.pred_sequence_length, len(self.target_label_indices))
             self.results.train_targs = self.results.train_targs.reshape(
                 -1, self.data_config.pred_sequence_length, len(self.target_label_indices))
