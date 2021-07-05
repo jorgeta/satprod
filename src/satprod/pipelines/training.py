@@ -39,7 +39,7 @@ def train_model(config):
     Args:
         config (munch.Munch): the contents of 'config.yaml', located in the project root directory.
     
-    レットウンス　ノチング
+    何も返さない。
     """
     
     # initialize dataset and model based on the configuration dict
@@ -116,11 +116,12 @@ def train_loop(net, train_config: TrainConfig, data_config: DataConfig, data: Wi
         epoch = 0,
         lowest_valid_mae = np.inf,
         corr_train_mae = np.inf,
-        train_mae = [], 
+        train_mae = [],
         valid_mae = [],
         best_val_preds = [],
         val_targs = [],
         corr_train_preds = [],
+        train_preds = [],
         train_targs = [],
         test_preds = [],
         test_targs = [],
@@ -300,10 +301,8 @@ def train_loop(net, train_config: TrainConfig, data_config: DataConfig, data: Wi
         
         if train_mae_cur < lowest_train_mae:
             lowest_train_mae = train_mae_cur
-            results.corr_train_mae = train_mae_cur
-            results.corr_train_preds = train_preds
+            results.train_preds = train_preds
             results.train_targs = train_targs
-            
         
         scheduler.step()
         

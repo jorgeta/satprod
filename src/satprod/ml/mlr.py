@@ -28,13 +28,33 @@ class MLR(nn.Module):
         x_prod = data_dict['X_prod']
         x_weather = data_dict['X_weather']
         x_weather_forecasts = data_dict['X_weather_forecasts']
-        
-        self.batch_size = x_prod.shape[0]
-        
-        x = torch.cat([
-            x_prod.view(self.batch_size, -1), 
-            x_weather.view(self.batch_size, -1), 
-            x_weather_forecasts.view(self.batch_size, -1)
-            ], dim=1)
+        if x_prod is not None:
+            self.batch_size = x_prod.shape[0]
+            if x_weather is not None:
+                if x_weather_forecasts is not None:
+                    x = torch.cat([
+                        x_prod.view(self.batch_size, -1), 
+                        x_weather.view(self.batch_size, -1), 
+                        x_weather_forecasts.view(self.batch_size, -1)
+                        ], dim=1)
+                else:
+                    x = torch.cat([
+                        x_prod.view(self.batch_size, -1), 
+                        x_weather.view(self.batch_size, -1)
+                    ], dim=1)
+            else:
+                x = x_prod.view(self.batch_size, -1)
+        else:
+            if x_weather is not None:
+                self.batch_size = x_weather.shape[0]
+                if x_weather_forecasts is not None:
+                    x = torch.cat([
+                        x_weather.view(self.batch_size, -1), 
+                        x_weather_forecasts.view(self.batch_size, -1)
+                    ], dim=1)
+                else:
+                    x = x_weather.view(self.batch_size, -1), 
+            else:
+                raise Exception('MLR needs either production, wind speed or wind direction to function.')
         
         return self.linear(x).view(self.batch_size, self.pred_sequence_length, self.output_size)

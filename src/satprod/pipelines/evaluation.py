@@ -28,6 +28,7 @@ class Results():
     best_val_preds: [float]
     val_targs: [float]
     corr_train_preds: [float]
+    train_preds: [float]
     train_targs: [float]
     test_mae: float
     test_preds: [float]
@@ -60,15 +61,19 @@ def store_results(
     os.makedirs(path, exist_ok=True)
     
     results.corr_train_preds = np.array(results.corr_train_preds)
+    results.train_preds = np.array(results.train_preds)
     results.train_targs = np.array(results.train_targs)
     
     results.corr_train_preds = results.corr_train_preds.reshape(-1, data_config.pred_sequence_length*len(target_label_indices))
+    results.train_preds = results.train_preds.reshape(-1, data_config.pred_sequence_length*len(target_label_indices))
     results.train_targs = results.train_targs.reshape(-1, data_config.pred_sequence_length*len(target_label_indices))
     
     savetxt(f'{path}/corr_train_preds.csv', results.corr_train_preds, delimiter=',')
+    savetxt(f'{path}/train_preds.csv', results.train_preds, delimiter=',')
     savetxt(f'{path}/train_targs.csv', results.train_targs, delimiter=',')
     
     results.corr_train_preds = None
+    results.train_preds = None
     results.train_targs = None
     
     info = (model, 
@@ -104,7 +109,7 @@ class ModelEvaluation():
         self.get_stored_results()
         
         self.train_preds_unscaled, self.train_targs_unscaled = self.unscale_predictions(
-            self.results.corr_train_preds, 
+            self.results.train_preds, 
             self.results.train_targs
         )
         
@@ -283,4 +288,3 @@ class ModelEvaluation():
         
         plt.savefig(f'{self.path}/training_curve.png')
         plt.close()
-        
