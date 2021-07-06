@@ -90,7 +90,7 @@ class TCN(nn.Module):
                     x = torch.cat([x, x_weather_forecasts], dim=1)
             else:
                 self.batch_size = x_prod.shape[0]
-                x = torch.cat([x_prod, torch.zeros(self.batch_size, self.pred_sequence_length, self.output_size)], dim=1)
+                x = pad(x_prod, (0, 0, self.pred_sequence_length, 0))
         else:
             if x_weather is not None:
                 x = x_weather
