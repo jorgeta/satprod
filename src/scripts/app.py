@@ -55,6 +55,10 @@ class App:
                 self.config.data_config.numerical_features = numerical_features
             
         if parameter_tuning:
+            if self.config.model == 'LSTM':
+                
+                pass
+            
             if self.config.model == 'TCN':
                 channel_combinations = [
                     [32, 32, 32],
@@ -82,11 +86,45 @@ class App:
             train_model(self.config)
         
     def evaluate(self):
-        model_name = 'TCN'
-        timestamp = '2021-06-14-13-02'
-        park = 'skom'
-        sorting = 'num'
-        ModelEvaluation(timestamp=timestamp, model_name=model_name, park=park, sorting=sorting)
+        timestamps = [
+            #'2021-06-14-13-02',
+            '2021-07-03-04-16',
+            '2021-07-03-23-38',
+            '2021-07-04-07-37',
+            '2021-07-04-15-06',
+            '2021-07-05-05-04',
+            '2021-07-05-14-34',
+            '2021-07-06-01-27',
+            '2021-07-03-07-52',
+            '2021-07-03-23-53',
+            '2021-07-04-08-21',
+            '2021-07-04-21-12',
+            '2021-07-05-05-34',
+            '2021-07-05-15-14',
+            '2021-07-06-11-26',
+            '2021-07-02-20-40',
+            '2021-07-03-11-26',
+            '2021-07-04-00-09',
+            '2021-07-04-14-19',
+            '2021-07-04-21-33',
+            '2021-07-05-05-57',
+            '2021-07-05-23-45',
+            '2021-07-06-12-14',
+            '2021-07-03-00-31',
+            '2021-07-03-15-16',
+            '2021-07-04-07-20',
+            '2021-07-04-14-38',
+            '2021-07-04-21-50',
+            '2021-07-05-13-59',
+            '2021-07-06-00-27',
+            '2021-07-06-13-13'
+        ]
+        for timestamp in timestamps:
+            model_name = 'TCN'
+            #timestamp = '2021-06-16-11-29'
+            park = 'skom'
+            sorting = 'num'
+            ModelEvaluation(timestamp=timestamp, model_name=model_name, park=park, sorting=sorting)
         
     def compare(self, park: str):
         ModelComparison(park, self.config.comparison)

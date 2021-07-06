@@ -12,7 +12,7 @@ data_config:
   pred_sequence_length: 5 # if changing, run 'satprod num update_formatted_files'
   use_numerical_forecasts: True
   use_img_forecasts: True
-  crop_image: True
+  crop_image: False
   
   valid_start: {'year': 2019, 'month': 5, 'day': 12, 'hour': 0}
   test_start: {'year': 2020, 'month': 5, 'day': 12, 'hour': 0}

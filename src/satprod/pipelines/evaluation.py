@@ -159,7 +159,12 @@ class ModelEvaluation():
         
         if results.corr_train_preds is None:
             self.results.corr_train_preds = loadtxt(f'{self.path}/corr_train_preds.csv', delimiter=',')
-            self.results.train_preds = loadtxt(f'{self.path}/train_preds.csv', delimiter=',')
+            try:
+                self.results.train_preds = loadtxt(f'{self.path}/train_preds.csv', delimiter=',')
+            except:
+                logging.warning('Using corr train preds as train preds due to old program version.')
+                self.results.train_preds = self.results.corr_train_preds
+            
             self.results.train_targs = loadtxt(f'{self.path}/train_targs.csv', delimiter=',')
             
             self.results.corr_train_preds = self.results.corr_train_preds.reshape(
@@ -176,12 +181,14 @@ class ModelEvaluation():
         info_str += f'\nLowest validation MAE: {self.results.lowest_valid_mae}'
         info_str += f'\nCorresponding train MAE: {self.results.corr_train_mae}'
         info_str += f'\nEpoch of lowest validation MAE: {self.results.epoch}'
-        info_str += f'\n{self.net}'
+        info_str += f'\n------ Net vars ------'
         for key, value in vars(self.net).items():
             if not key.startswith('_') and key!='training':
                 info_str += f'\n{key}: {value}'
+        info_str += f'\n------ Train config vars ------'
         for key, value in vars(self.train_config).items():
             info_str += f'\n{key}: {value}'
+        info_str += f'\n------ Data config vars ------'
         for key, value in vars(self.data_config).items():
             info_str += f'\n{key}: {value}'
         
@@ -195,6 +202,8 @@ class ModelEvaluation():
             info_str += f'\nPersistence Test MAEs:\n{self.persistence_test_error_matrix}'
         except:
             pass
+        
+        info_str += f'\n{self.net}'
         
         if to_console: logging.info(info_str)
         
