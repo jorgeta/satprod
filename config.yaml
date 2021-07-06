@@ -1,12 +1,12 @@
 app: satprod
 
 model: 'LSTM' #'SIN', 'LSTM', 'TCN', 'TCN_Bai', 'MLR'
-train_on_one_batch: False
+train_on_one_batch: True
 
 data_config:
-  parks: ['skom'] # ['bess', 'vals','skom','yvik']
+  parks: ['vals'] # ['bess', 'vals','skom','yvik']
   numerical_features: ['production'] #['production', 'speed', 'direction', 'temporal']
-  use_img_features: False
+  use_img_features: True
   img_extraction_method: 'resnet' # 'lenet', 'resnet', 'vgg'
   
   pred_sequence_length: 5 # if changing, run 'satprod num update_formatted_files'
@@ -43,9 +43,9 @@ img_extraction_methods:
 
 models:
   lstm:
-    sequence_length: 12 # 5 13 29 61
-    hidden_size: 32 # 32 48 64
-    linear_size: 64 # 64 128 256
+    sequence_length: 5 # 5 13 29 61
+    hidden_size: 64 # 32 48 64
+    linear_size: 128 # 64 128 256
     num_layers: 1
     dropout: 0.2 # 0.2 0.3 0.4
   tcn:
