@@ -19,7 +19,7 @@ class LSTM(nn.Module):
                 img_extraction_method: str=None,
                 lenet_params: dict=None, 
                 resnet_params: dict=None,
-                deepsense_params: dict=None):
+                vgg_params: dict=None):
         super(LSTM, self).__init__()
         
         self.name = 'LSTM'
@@ -44,8 +44,6 @@ class LSTM(nn.Module):
         elif img_extraction_method=='vgg':
             self.vgg = VGG(**vgg_params)
             self.num_image_features = vgg_params['output_size']
-        else:
-            raise NotImplementedError
         
         self.dropout = nn.Dropout(dropout)
         

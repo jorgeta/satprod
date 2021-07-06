@@ -56,8 +56,24 @@ class App:
             
         if parameter_tuning:
             if self.config.model == 'LSTM':
+                sequence_length_combinations = [
+                    5, 13, 29
+                ]
+                hidden_size_combinations = [
+                    32, 48, 64
+                ]
+                linear_size_combinations = [
+                    64, 128, 256
+                ]
                 
-                pass
+                for sequence_length in sequence_length_combinations:
+                    for hidden_size in hidden_size_combinations:
+                        for linear_size in linear_size_combinations:
+                            self.config.models.lstm.sequence_length = sequence_length
+                            self.config.models.lstm.hidden_size = hidden_size
+                            self.config.models.lstm.linear_size = linear_size
+                            
+                            train_model(self.config)
             
             if self.config.model == 'TCN':
                 channel_combinations = [
@@ -86,45 +102,11 @@ class App:
             train_model(self.config)
         
     def evaluate(self):
-        timestamps = [
-            #'2021-06-14-13-02',
-            '2021-07-03-04-16',
-            '2021-07-03-23-38',
-            '2021-07-04-07-37',
-            '2021-07-04-15-06',
-            '2021-07-05-05-04',
-            '2021-07-05-14-34',
-            '2021-07-06-01-27',
-            '2021-07-03-07-52',
-            '2021-07-03-23-53',
-            '2021-07-04-08-21',
-            '2021-07-04-21-12',
-            '2021-07-05-05-34',
-            '2021-07-05-15-14',
-            '2021-07-06-11-26',
-            '2021-07-02-20-40',
-            '2021-07-03-11-26',
-            '2021-07-04-00-09',
-            '2021-07-04-14-19',
-            '2021-07-04-21-33',
-            '2021-07-05-05-57',
-            '2021-07-05-23-45',
-            '2021-07-06-12-14',
-            '2021-07-03-00-31',
-            '2021-07-03-15-16',
-            '2021-07-04-07-20',
-            '2021-07-04-14-38',
-            '2021-07-04-21-50',
-            '2021-07-05-13-59',
-            '2021-07-06-00-27',
-            '2021-07-06-13-13'
-        ]
-        for timestamp in timestamps:
-            model_name = 'TCN'
-            #timestamp = '2021-06-16-11-29'
-            park = 'skom'
-            sorting = 'num'
-            ModelEvaluation(timestamp=timestamp, model_name=model_name, park=park, sorting=sorting)
+        model_name = 'TCN'
+        timestamp = '2021-07-06-13-13'
+        park = 'skom'
+        sorting = 'num'
+        ModelEvaluation(timestamp=timestamp, model_name=model_name, park=park, sorting=sorting)
         
     def compare(self, park: str):
         ModelComparison(park, self.config.comparison)
