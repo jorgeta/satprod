@@ -100,7 +100,8 @@ def train_loop(net, train_config: TrainConfig, data_config: DataConfig, data: Wi
     logging.info(f'Parameters in network: {params_in_network}.')
     
     criterion = nn.L1Loss()
-    optimizer = optim.Adam(net.parameters(), lr=train_config.learning_rate)
+    optimizer = optim.Adam(
+        net.parameters(), lr=train_config.learning_rate, weight_decay=train_config.weight_decay)
     
     # get train and valid indices
     train_indices = np.arange(sequence_length, data.valid_start_index - pred_sequence_length)
@@ -161,48 +162,9 @@ def train_loop(net, train_config: TrainConfig, data_config: DataConfig, data: Wi
     path = f'storage'
     os.makedirs(path, exist_ok=True)
     
-    for epoch in range(num_epochs):
+    for epoch in range(num_epochs+1):
         # shuffle
         np.random.shuffle(train_indices)
-        
-        ## Train
-        net.train()
-        for i in tqdm(range(num_batches_train+1), desc="Training"):
-            train_batch_indices = train_indices[i*batch_size:(i+1)*batch_size]
-            
-            optimizer.zero_grad()
-            
-            data_dict = get_sequenced_data(
-                batch_indices = train_batch_indices, 
-                sequence_length = sequence_length, 
-                train_config = train_config, 
-                data_config = data_config,
-                data = data,
-                device = device
-            )
-            
-            if data_dict['X_prod'] is None and data_dict['X_img'] is None: continue
-            if data_config.use_img_features > 0:
-                current_batch_size = data_dict['X_img'].shape[0]
-            else:
-                current_batch_size = data_dict['X_prod'].shape[0]
-            
-            X_prod = data_dict['X_prod']
-            if 'production' not in data_config.numerical_features:
-                data_dict['X_prod'] = None
-            
-            output = net(data_dict)
-            
-            # compute gradients given loss
-            y_prod = data_dict['y_prod']
-            if data_config.model=='TCN_Bai' or data_config.model=='TCN':
-                if not net.only_predict_future_values:
-                    y_prod = torch.cat([X_prod[:, pred_sequence_length:, :], data_dict['y_prod']], dim=1)
-            
-            batch_loss = criterion(output, y_prod)
-            
-            batch_loss.backward()
-            optimizer.step()
         
         net.eval()
         ## Evaluate training
@@ -304,12 +266,53 @@ def train_loop(net, train_config: TrainConfig, data_config: DataConfig, data: Wi
             results.train_preds = train_preds
             results.train_targs = train_targs
         
-        scheduler.step()
-        
         # plot the current state of the training
         temporary_plot(results, val_targs, val_preds)
         
-        logging.info('Epoch %2i : Train MAE %f, Valid MAE %f' % (epoch+1, train_mae_cur, valid_mae_cur))
+        logging.info('Epoch %2i : Train MAE %f, Valid MAE %f' % (epoch, train_mae_cur, valid_mae_cur))
+        
+        if epoch==num_epochs: continue
+        
+        ## Train
+        net.train()
+        for i in tqdm(range(num_batches_train+1), desc="Training"):
+            train_batch_indices = train_indices[i*batch_size:(i+1)*batch_size]
+            
+            optimizer.zero_grad()
+            
+            data_dict = get_sequenced_data(
+                batch_indices = train_batch_indices, 
+                sequence_length = sequence_length, 
+                train_config = train_config, 
+                data_config = data_config,
+                data = data,
+                device = device
+            )
+            
+            if data_dict['X_prod'] is None and data_dict['X_img'] is None: continue
+            if data_config.use_img_features > 0:
+                current_batch_size = data_dict['X_img'].shape[0]
+            else:
+                current_batch_size = data_dict['X_prod'].shape[0]
+            
+            X_prod = data_dict['X_prod']
+            if 'production' not in data_config.numerical_features:
+                data_dict['X_prod'] = None
+            
+            output = net(data_dict)
+            
+            # compute gradients given loss
+            y_prod = data_dict['y_prod']
+            if data_config.model=='TCN_Bai' or data_config.model=='TCN':
+                if not net.only_predict_future_values:
+                    y_prod = torch.cat([X_prod[:, pred_sequence_length:, :], data_dict['y_prod']], dim=1)
+            
+            batch_loss = criterion(output, y_prod)
+            
+            batch_loss.backward()
+            optimizer.step()
+        
+        scheduler.step()
     
     with open(f'{path}/best_model_{now}.pickle', 'rb') as model_file:
         best_model = pickle.load(model_file)
@@ -494,7 +497,8 @@ def init_data_and_model(config):
         learning_rate = config.train_config.learning_rate,
         scheduler_gamma = config.train_config.scheduler_gamma,
         random_seed = config.train_config.random_seed,
-        train_on_one_batch = config.train_on_one_batch
+        train_on_one_batch = config.train_on_one_batch,
+        weight_decay=config.train_config.weight_decay
     )
     
     logging.info(vars(train_config))

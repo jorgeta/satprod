@@ -1,17 +1,17 @@
 app: satprod
 
-model: 'LSTM' #'SIN', 'LSTM', 'TCN', 'TCN_Bai', 'MLR'
-train_on_one_batch: True
+model: 'SIN' #'SIN', 'LSTM', 'TCN', 'TCN_Bai', 'MLR'
+train_on_one_batch: False
 
 data_config:
   parks: ['vals'] # ['bess', 'vals','skom','yvik']
-  numerical_features: ['production'] #['production', 'speed', 'direction', 'temporal']
+  numerical_features: [] #['production', 'speed', 'direction', 'temporal']
   use_img_features: True
   img_extraction_method: 'resnet' # 'lenet', 'resnet', 'vgg'
   
   pred_sequence_length: 5 # if changing, run 'satprod num update_formatted_files'
   use_numerical_forecasts: True
-  use_img_forecasts: True
+  use_img_forecasts: False
   crop_image: False
   
   valid_start: {'year': 2019, 'month': 5, 'day': 12, 'hour': 0}
@@ -19,11 +19,12 @@ data_config:
   test_end: {'year': 2021, 'month': 5, 'day': 11, 'hour': 23}
 
 train_config:
-  batch_size: 64
-  num_epochs: 40
+  batch_size: 16
+  num_epochs: 3
   learning_rate: 1.0e-3
   scheduler_gamma: 0.9
   random_seed: 0
+  weight_decay: 0.1 # 0.1, 0.01, 0.001, 0.0001, 0.00001
 
 img_extraction_methods:
   lenet:
@@ -61,7 +62,7 @@ models:
   mlr:
     sequence_length: 3
   sin:
-    dropout: 0.1
+    dropout: 0.5
     sequence_length: 1
 
 comparison: # {'timestamp': , 'model_name': , 'sorting': 'num'}

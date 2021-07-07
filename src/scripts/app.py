@@ -102,9 +102,9 @@ class App:
             train_model(self.config)
         
     def evaluate(self):
-        model_name = 'TCN'
-        timestamp = '2021-07-06-13-13'
-        park = 'skom'
+        model_name = 'MLR'
+        timestamp = '2021-07-05-22-25'
+        park = 'vals'
         sorting = 'num'
         ModelEvaluation(timestamp=timestamp, model_name=model_name, park=park, sorting=sorting)
         

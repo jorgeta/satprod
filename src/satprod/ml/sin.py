@@ -20,6 +20,7 @@ class SIN(nn.Module):
         self.output_size = output_size
         self.num_output_features = num_output_features
         self.sequence_length = sequence_length
+        self.dropout_value = dropout
         
         self.img_extraction_method = img_extraction_method
         if self.img_extraction_method=='lenet':
@@ -39,7 +40,7 @@ class SIN(nn.Module):
             self.output_size*self.num_output_features
         )
         
-        self.dropout = nn.Dropout(dropout)
+        self.dropout = nn.Dropout(self.dropout_value)
         
         self.relu = nn.ReLU()
     

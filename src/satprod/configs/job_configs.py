@@ -13,6 +13,7 @@ class TrainConfig():
     batch_size: int = 64
     num_epochs: int = 150
     random_seed: int = 0
+    weight_decay: float = 0.0
     
     def __post_init__(self):
         # lower the learning rate with a factor 0.9 after 90 % of the epochs has passed
