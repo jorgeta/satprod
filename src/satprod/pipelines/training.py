@@ -385,7 +385,10 @@ def get_sequenced_data(
     
     for j in batch_indices:
         input_data = data[j-sequence_length:j].copy()
-        target_data = data[j:j+data_config.pred_sequence_length][data.target_labels].copy()
+        if train_config.predict_current_time:
+            target_data = data[j-1:j+data_config.pred_sequence_length-1][data.target_labels].copy()
+        else:
+            target_data = data[j:j+data_config.pred_sequence_length][data.target_labels].copy()
 
         # the input and target data must not contain missing values
         if len(input_data.dropna(axis=0)) < sequence_length: continue
@@ -491,17 +494,25 @@ def init_data_and_model(config):
         data_config
         wind_dataset
     """
+    #random_seed = config.train_config.random_seed
+    random_seed = np.random.randint(100)
+    
     train_config = TrainConfig(
         batch_size = config.train_config.batch_size,
         num_epochs = config.train_config.num_epochs,
         learning_rate = config.train_config.learning_rate,
         scheduler_gamma = config.train_config.scheduler_gamma,
-        random_seed = config.train_config.random_seed,
+        random_seed = random_seed,
         train_on_one_batch = config.train_on_one_batch,
-        weight_decay=config.train_config.weight_decay
+        weight_decay=config.train_config.weight_decay,
+        predict_current_time=config.train_config.predict_current_time
     )
     
     logging.info(vars(train_config))
+    if train_config.predict_current_time:
+        pred_sequence_length = config.data_config.pred_sequence_length+1
+    else:
+        pred_sequence_length = config.data_config.pred_sequence_length
     
     data_config = DataConfig(
         model = config.model, 
@@ -509,7 +520,7 @@ def init_data_and_model(config):
         numerical_features = config.data_config.numerical_features, 
         use_img_features = config.data_config.use_img_features, 
         img_extraction_method = config.data_config.img_extraction_method,
-        pred_sequence_length = config.data_config.pred_sequence_length,
+        pred_sequence_length = pred_sequence_length,
         use_numerical_forecasts = config.data_config.use_numerical_forecasts,
         use_img_forecasts = config.data_config.use_img_forecasts,
         crop_image = config.data_config.crop_image,
