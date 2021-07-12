@@ -16,6 +16,36 @@ from satprod.data_handlers.data_utils import get_columns
 
 from tasklog.tasklogger import logging
 
+plt.rcParams.update({
+    "text.usetex": True,
+    "font.family": "sans-serif",
+    "font.sans-serif": ["Helvetica"]})
+# for Palatino and other serif fonts use:
+plt.rcParams.update({
+    "text.usetex": True,
+    "font.family": "serif",
+    "font.serif": ["Palatino"],
+})
+
+plt.rc('axes', facecolor='#E6E6E6', edgecolor='none', axisbelow=True, grid=True)
+plt.rc('grid', color='w', linestyle='solid')
+plt.rc('xtick', direction='out', color='gray', labelsize=20)
+plt.rc('ytick', direction='out', color='gray', labelsize=20)
+plt.rc('patch', edgecolor='#E6E6E6')
+plt.rc('lines', linewidth=2)
+
+SMALL_SIZE = 16
+MEDIUM_SIZE = 20
+BIGGER_SIZE = 24
+
+plt.rc('font', size=BIGGER_SIZE)          # controls default text sizes
+plt.rc('axes', titlesize=SMALL_SIZE)     # fontsize of the axes title
+plt.rc('axes', labelsize=MEDIUM_SIZE)    # fontsize of the x and y labels
+plt.rc('xtick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
+plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
+
 @dataclass
 class Results():
     params_in_network: int
@@ -107,11 +137,16 @@ class ModelEvaluation():
         }
         
         self.get_stored_results()
-        
-        self.train_preds_unscaled, self.train_targs_unscaled = self.unscale_predictions(
-            self.results.train_preds, 
-            self.results.train_targs
-        )
+        try:
+            self.train_preds_unscaled, self.train_targs_unscaled = self.unscale_predictions(
+                self.results.train_preds, 
+                self.results.train_targs
+            )
+        except:
+            self.train_preds_unscaled, self.train_targs_unscaled = self.unscale_predictions(
+                self.results.corr_train_preds, 
+                self.results.train_targs
+            )
         
         self.valid_preds_unscaled, self.valid_targs_unscaled = self.unscale_predictions(
             self.results.best_val_preds, 
@@ -266,33 +301,34 @@ class ModelEvaluation():
     
     def plot_fitting_example(self, preds_unscaled, targs_unscaled, dataset_name: str):
         
-        plt.figure()
-        plt.ylabel('production (kWh/h)')
-        plt.xlabel('hours')
-        index = 1
+        if self.train_config.predict_current_time:
+            index = 0
+        else:
+            index = 1
         n_samples_shown = np.minimum(50, targs_unscaled.shape[0])
         n_plots = self.data_config.pred_sequence_length*len(self.data_config.parks)
         for i in range(self.data_config.pred_sequence_length):
             for j in range(len(self.data_config.parks)):
-                plt.subplot(self.data_config.pred_sequence_length, len(self.data_config.parks), index) #(nrows, ncols, index)
+                #plt.subplot(self.data_config.pred_sequence_length, len(self.data_config.parks), index) #(nrows, ncols, index)
+                plt.figure()
+                plt.ylabel('production (kWh/h)')
+                plt.xlabel('hours')
+                
                 plt.plot(np.ravel(np.array(targs_unscaled)[:n_samples_shown, i, j]), label='targets')
                 plt.plot(np.ravel(np.array(preds_unscaled)[:n_samples_shown, i, j]), label='predicitions')
                 
                 if self.train_config.predict_current_time:
-                    plt.title(f'{i}h ahead at {self.park_name[self.data_config.parks[j]]}, {dataset_name} set', fontsize=8)
+                    plt.title(f'{i}h ahead at {self.park_name[self.data_config.parks[j]]}, {dataset_name} set')
                 else:
-                    plt.title(f'{i+1}h ahead at {self.park_name[self.data_config.parks[j]]}, {dataset_name} set', fontsize=8)
-                if index==n_plots:
-                    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=8)
-                    plt.xticks(fontsize=8)
-                    plt.yticks(fontsize=8)
-                else:
-                    plt.xticks([])
+                    plt.title(f'{i+1}h ahead at {self.park_name[self.data_config.parks[j]]}, {dataset_name} set')
+                #plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+                plt.legend()
+                
                 plt.tight_layout()
+                plt.savefig(f'{self.path}/{dataset_name}_{index}_fitting_examples.png')
+                plt.close()
+                
                 index += 1
-        plt.tight_layout()
-        plt.savefig(f'{self.path}/{dataset_name}_fitting_examples.png')
-        plt.close()
         
     def plot_training_curve(self):
         
@@ -302,6 +338,6 @@ class ModelEvaluation():
         plt.xlabel('epochs')
         plt.ylabel('MAE')
         plt.axvline(x=self.results.epoch)
-        
+        plt.tight_layout()
         plt.savefig(f'{self.path}/training_curve.png')
         plt.close()

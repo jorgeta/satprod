@@ -10,6 +10,36 @@ from sklearn.metrics import mean_absolute_error
 
 from tasklog.tasklogger import logging
 
+plt.rcParams.update({
+    "text.usetex": True,
+    "font.family": "sans-serif",
+    "font.sans-serif": ["Helvetica"]})
+# for Palatino and other serif fonts use:
+plt.rcParams.update({
+    "text.usetex": True,
+    "font.family": "serif",
+    "font.serif": ["Palatino"],
+})
+
+plt.rc('axes', facecolor='#E6E6E6', edgecolor='none', axisbelow=True, grid=True)
+plt.rc('grid', color='w', linestyle='solid')
+plt.rc('xtick', direction='out', color='gray', labelsize=20)
+plt.rc('ytick', direction='out', color='gray', labelsize=20)
+plt.rc('patch', edgecolor='#E6E6E6')
+plt.rc('lines', linewidth=2)
+
+SMALL_SIZE = 12
+MEDIUM_SIZE = 16
+BIGGER_SIZE = 18
+
+plt.rc('font', size=BIGGER_SIZE)          # controls default text sizes
+plt.rc('axes', titlesize=SMALL_SIZE)     # fontsize of the axes title
+plt.rc('axes', labelsize=MEDIUM_SIZE)    # fontsize of the x and y labels
+plt.rc('xtick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
+plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
+
 class ModelComparison():
     
     def __init__(self, park: str, config):
@@ -31,6 +61,7 @@ class ModelComparison():
                     raise Exception('The "model1" slot must be filled, as it is used as the main model of the comparison.')
                 continue
             value['park']=self.park
+            
             try:
                 self.eval_dict[key] = ModelEvaluation(**value)
             except:
@@ -67,7 +98,10 @@ class ModelComparison():
         df = pd.concat([TE_predictions, prod], axis=1)
         df = df.dropna(axis=0)
         
-        benchmark_test_error_matrix = np.zeros_like(self.eval_dict['model1'].train_error_matrix)
+        if self.pred_sequence_length==6:
+            benchmark_test_error_matrix = np.zeros_like(self.eval_dict['model1'].train_error_matrix[1:,:]) #(5,4)
+        else:
+            benchmark_test_error_matrix = np.zeros_like(self.eval_dict['model1'].train_error_matrix) #(5,4)
         
         for i in range(self.pred_sequence_length):
             for j in range(len(prod_columns)):
@@ -84,7 +118,10 @@ class ModelComparison():
         prod = get_columns(self.wind_dataset.data_unscaled, 'production')
         prod_columns = prod.columns
         
-        persistence_error_matrix = np.zeros_like(self.eval_dict['model1'].train_error_matrix) #(5,4)
+        if self.pred_sequence_length==6:
+            persistence_error_matrix = np.zeros_like(self.eval_dict['model1'].train_error_matrix[1:,:]) #(5,4)
+        else:
+            persistence_error_matrix = np.zeros_like(self.eval_dict['model1'].train_error_matrix) #(5,4)
         
         for i in range(self.pred_sequence_length):
             for col in prod_columns:
@@ -116,16 +153,25 @@ class ModelComparison():
         if dataset_name=='train':
             models['Persistence'] = self.persistence_train_error_matrix
             for key, model in self.eval_dict.items():
-                models[f'{model.model_name}'+f'{model.timestamp}'] = model.train_error_matrix
+                if self.pred_sequence_length==6:
+                    models[f'{model.model_name}'+f'{model.timestamp}'] = model.train_error_matrix[1:,:]
+                else:
+                    models[f'{model.model_name}'+f'{model.timestamp}'] = model.train_error_matrix
         elif dataset_name=='valid':
             models['Persistence'] = self.persistence_valid_error_matrix
             for key, model in self.eval_dict.items():
-                models[f'{model.model_name}'+f'{model.timestamp}'] = model.valid_error_matrix
+                if self.pred_sequence_length==6:
+                    models[f'{model.model_name}'+f'{model.timestamp}'] = model.train_error_matrix[1:,:]
+                else:
+                    models[f'{model.model_name}'+f'{model.timestamp}'] = model.valid_error_matrix
         else:
             models['TE (benchmark)'] = self.benchmark_test_error_matrix
             models['Persistence'] = self.persistence_test_error_matrix
             for key, model in self.eval_dict.items():
-                models[f'{model.model_name} ({model.timestamp})'] = model.test_error_matrix
+                if self.pred_sequence_length==6:
+                    models[f'{model.model_name}'+f'{model.timestamp}'] = model.train_error_matrix[1:,:]
+                else:
+                    models[f'{model.model_name} ({model.timestamp})'] = model.test_error_matrix
         
         width = 0.1  # the width of the bars
         labels = ['+1h', '+2h', '+3h', '+4h', '+5h']
@@ -142,11 +188,15 @@ class ModelComparison():
 
         # Add some text for labels, title and custom x-axis tick labels, etc.
         ax.set_ylabel('MAE')
-        ax.set_xlabel('Hours ahead')
-        ax.set_title(f'MAE comparison on the {dataset_name} set')
+        ax.set_xlabel('hours ahead')
+        dataset_name_name = dataset_name
+        if dataset_name_name=='valid':
+            dataset_name_name = 'validation'
+        ax.set_title(f'MAE comparison on the {dataset_name_name} set')
         ax.set_xticks(x_axis[-1])
         ax.set_xticklabels(labels)
-        ax.legend()
-        
+        #ax.legend()
+        #ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+        ax.legend(loc='upper left')
         plt.tight_layout()
         plt.savefig(f'{self.comparison_storage_path}/{dataset_name}_comparison.png')

@@ -1,12 +1,12 @@
 app: satprod
 
-model: 'SIN' #'SIN', 'LSTM', 'TCN', 'TCN_Bai', 'MLR'
-train_on_one_batch: False
+model: 'MLR' #'SIN', 'LSTM', 'TCN', 'TCN_Bai', 'MLR'
+train_on_one_batch: True
 
 data_config:
   parks: ['vals'] # ['bess', 'vals','skom','yvik']
-  numerical_features: [] #['production', 'speed', 'direction', 'temporal']
-  use_img_features: True
+  numerical_features: ['production'] #['production', 'speed', 'direction', 'temporal']
+  use_img_features: False
   img_extraction_method: 'resnet' # 'lenet', 'resnet', 'vgg'
   
   pred_sequence_length: 5 # if changing, run 'satprod num update_formatted_files'
@@ -20,7 +20,7 @@ data_config:
 
 train_config:
   batch_size: 64
-  num_epochs: 15
+  num_epochs: 1
   learning_rate: 1.0e-3
   scheduler_gamma: 0.9
   random_seed: 0
@@ -70,9 +70,9 @@ comparison: # {'timestamp': , 'model_name': , 'sorting': 'num'}
   skom: 
     model1: {'timestamp': '2021-06-13-06-27', 'model_name': 'MLR', 'sorting': 'num'}
     model2: {'timestamp': '2021-06-14-02-03', 'model_name': 'LSTM', 'sorting': 'num'}
-    model3: {'timestamp': '2021-06-14-13-02', 'model_name': 'TCN', 'sorting': 'num'}
-    model4: {'timestamp': '2021-06-15-21-27', 'model_name': 'TCN', 'sorting': 'num'}
-    model5: {'timestamp': '2021-06-19-02-42', 'model_name': 'SRN', 'sorting': 'img'}
+    model3: #{'timestamp': '2021-06-14-13-02', 'model_name': 'TCN', 'sorting': 'num'}
+    model4: #{'timestamp': '2021-06-15-21-27', 'model_name': 'TCN', 'sorting': 'num'}
+    model5: 
     model6: 
     model7: 
   bess:

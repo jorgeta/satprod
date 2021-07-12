@@ -103,9 +103,9 @@ class App:
         
     def evaluate(self):
         model_name = 'MLR'
-        timestamp = '2021-07-05-22-25'
+        timestamp = '2021-07-12-15-21'
         park = 'vals'
-        sorting = 'num'
+        sorting = 'test'
         ModelEvaluation(timestamp=timestamp, model_name=model_name, park=park, sorting=sorting)
         
     def compare(self, park: str):
