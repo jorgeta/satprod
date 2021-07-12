@@ -257,7 +257,10 @@ class ModelEvaluation():
             axis[i].set_xlabel('hours ahead')
             axis[i].set_ylabel('MAE')
             axis[i].set_xticks(range(error_matrix.shape[0]))
-            axis[i].set_xticklabels([f'{h+1}' for h in range(error_matrix.shape[0])])
+            if self.train_config.predict_current_time:
+                axis[i].set_xticklabels([f'{h}' for h in range(error_matrix.shape[0])])
+            else:
+                axis[i].set_xticklabels([f'{h+1}' for h in range(error_matrix.shape[0])])
         plt.savefig(f'{self.path}/{dataset_name}_maes.png')
         plt.close()
     
@@ -275,8 +278,10 @@ class ModelEvaluation():
                 plt.plot(np.ravel(np.array(targs_unscaled)[:n_samples_shown, i, j]), label='targets')
                 plt.plot(np.ravel(np.array(preds_unscaled)[:n_samples_shown, i, j]), label='predicitions')
                 
-                
-                plt.title(f'{i+1}h ahead at {self.park_name[self.data_config.parks[j]]}, {dataset_name} set', fontsize=8)
+                if self.train_config.predict_current_time:
+                    plt.title(f'{i}h ahead at {self.park_name[self.data_config.parks[j]]}, {dataset_name} set', fontsize=8)
+                else:
+                    plt.title(f'{i+1}h ahead at {self.park_name[self.data_config.parks[j]]}, {dataset_name} set', fontsize=8)
                 if index==n_plots:
                     plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=8)
                     plt.xticks(fontsize=8)
