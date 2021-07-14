@@ -15,7 +15,7 @@ from satprod.pipelines.dataset import WindDataset
 from satprod.data_handlers.data_utils import get_columns
 
 from tasklog.tasklogger import logging
-
+'''
 plt.rcParams.update({
     "text.usetex": True,
     "font.family": "sans-serif",
@@ -45,7 +45,7 @@ plt.rc('xtick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
 plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
 plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
 plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
-
+'''
 @dataclass
 class Results():
     params_in_network: int

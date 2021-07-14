@@ -1,7 +1,7 @@
 app: satprod
 
 model: 'SIN' #'SIN', 'LSTM', 'TCN', 'TCN_Bai', 'MLR'
-train_on_one_batch: True
+train_on_one_batch: False
 
 data_config:
   parks: ['vals'] # ['bess', 'vals','skom','yvik']
