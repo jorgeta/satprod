@@ -1,12 +1,12 @@
 app: satprod
 
-model: 'MLR' #'SIN', 'LSTM', 'TCN', 'TCN_Bai', 'MLR'
+model: 'SIN' #'SIN', 'LSTM', 'TCN', 'TCN_Bai', 'MLR'
 train_on_one_batch: True
 
 data_config:
   parks: ['vals'] # ['bess', 'vals','skom','yvik']
-  numerical_features: ['production'] #['production', 'speed', 'direction', 'temporal']
-  use_img_features: False
+  numerical_features: [] #['production', 'speed', 'direction', 'temporal']
+  use_img_features: True
   img_extraction_method: 'resnet' # 'lenet', 'resnet', 'vgg'
   
   pred_sequence_length: 5 # if changing, run 'satprod num update_formatted_files'
@@ -20,7 +20,7 @@ data_config:
 
 train_config:
   batch_size: 64
-  num_epochs: 1
+  num_epochs: 15
   learning_rate: 1.0e-3
   scheduler_gamma: 0.9
   random_seed: 0
