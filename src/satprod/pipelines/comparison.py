@@ -10,7 +10,7 @@ from sklearn.metrics import mean_absolute_error
 
 from tasklog.tasklogger import logging
 
-plt.rcParams.update({
+'''plt.rcParams.update({
     "text.usetex": True,
     "font.family": "sans-serif",
     "font.sans-serif": ["Helvetica"]})
@@ -39,7 +39,7 @@ plt.rc('xtick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
 plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
 plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
 plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
-
+'''
 class ModelComparison():
     
     def __init__(self, park: str, config):
