@@ -195,7 +195,7 @@ class SatVid(Vid):
         
         # find first and last image within the input interval
         start_idx, stop_idx, interval = self.get_fitted_interval(data.timestamps, interval)
-        print(start_idx, stop_idx, interval)
+        
         self.img_paths = data.img_paths[start_idx:stop_idx]
         self.timestamps = data.timestamps[start_idx:stop_idx]
         self.interval = interval
@@ -267,12 +267,3 @@ class FlowVid(Vid):
         stop = self.interval.stop.strftime('%Y-%m-%d %H:%M')
         logging.info(f'Video interval: {start, stop}')
         self.create(self.name, self.img_array, self.timestamps)
-
-if __name__=='__main__':
-    interval = TimeInterval(datetime(2018,3,20), datetime(2018,3,20,23,59))
-    #satvid = SatVid('test', interval, 20)
-    #print(satvid.timestamps)
-    #satvid.save()
-    
-    #satvid.play('test', satvid.imgType.value)
-    #satvid.delete('test', satvid.imgType.value)

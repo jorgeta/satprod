@@ -469,17 +469,3 @@ class NumericalDataHandler():
         df.production_yvik.loc['2019-12-16 10:00:00':] = np.nan
         
         return df
-    
-
-if __name__=='__main__':
-    num = NumericalDataHandler()
-    
-    wind = num.get_wind_data()
-    
-    #print(wind.columns)
-    #print(wind)
-    
-    #prod = num.get_prod_data()
-    
-    #print(prod.columns)
-    #print(prod)

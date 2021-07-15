@@ -199,7 +199,3 @@ class ImgDataset(torch.utils.data.Dataset):
             return self.timestamps.index(date)
         except ValueError:
             return np.nan
-
-if __name__=='__main__':
-    data = ImgDataset(ImgType('grid'), normalize=True, upscale=True)
-    print(data[0].img.shape)

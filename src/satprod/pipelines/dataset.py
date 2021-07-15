@@ -130,14 +130,6 @@ class WindDataset(torch.utils.data.Dataset):
             str2 = 'or add any of the suggested feature types to "numerical_features" in config.yaml.'
             raise Exception(str1+str2)
         
-        '''print(self.data.columns)
-        print(self.n_image_features)
-        print(self.n_forecast_features)
-        #print(self.n_unique_forecast_features)
-        print(self.n_past_features)
-        print(self.n_output_features)
-        exit()'''
-        
     def update_image_indices(self):
         
         # all possible image features
