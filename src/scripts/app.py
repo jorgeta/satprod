@@ -57,7 +57,9 @@ class App:
         if parameter_tuning:
             if self.config.model == 'LSTM':
                 sequence_length_combinations = [
-                    5, 13, 29
+                    #5, 
+                    #13, 
+                    29
                 ]
                 hidden_size_combinations = [
                     32, 48, 64
@@ -69,6 +71,8 @@ class App:
                 for sequence_length in sequence_length_combinations:
                     for hidden_size in hidden_size_combinations:
                         for linear_size in linear_size_combinations:
+                            if hidden_size==32:
+                                if linear_size!=256: continue
                             self.config.models.lstm.sequence_length = sequence_length
                             self.config.models.lstm.hidden_size = hidden_size
                             self.config.models.lstm.linear_size = linear_size
@@ -77,8 +81,8 @@ class App:
             
             if self.config.model == 'TCN':
                 channel_combinations = [
-                    [32, 32, 32],
-                    [32, 32], 
+                    #[32, 32, 32],
+                    #[32, 32], 
                     [32],
                 ]
                 kernel_combinations = [

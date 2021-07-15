@@ -63,7 +63,8 @@ class TCN(nn.Module):
                 in_channels=self.channels[i-1] if i>0 else self.input_size,
                 out_channels=self.channels[i],
                 kernel_size=self.kernel_size,
-                dilation=self.dilations[i]
+                dilation=self.dilations[i],
+                dropout=self.dropout
             )
         
         self.tcn_stack = nn.Sequential(residual_block_stack)
