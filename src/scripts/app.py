@@ -83,7 +83,7 @@ class App:
                 channel_combinations = [
                     #[32, 32, 32],
                     #[32, 32], 
-                    [32],
+                    [32, 32, 32, 32],
                 ]
                 kernel_combinations = [
                     {'kernel_size': 3, 'dilation_base': 2},

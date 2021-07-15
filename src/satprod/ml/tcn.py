@@ -50,7 +50,7 @@ class TCN(nn.Module):
         assert self.kernel_size >= self.dilation_base
         
         self.sequence_length = int(
-            1+2*(self.kernel_size-1)*(2**len(self.channels)-1)/(2-1)
+            1+2*(self.kernel_size-1)*(2**len(self.channels)-1)/(self.dilation_base-1)
         )
         
         self.num_layers = len(self.channels)
@@ -115,6 +115,9 @@ class TCN(nn.Module):
                 x = torch.cat([x, x_img], dim=2)
             else: 
                 x = x_img
+        
+        print(x[0,:,:])
+        exit()
         
         x = self.tcn_stack(x.transpose(1,2)).transpose(1, 2)
         
@@ -220,21 +223,28 @@ if __name__=='__main__':
     
     tcn_params = {
         'num_past_features': num_past_features,
-        'num_forecast_features': num_forecast_features,
         'output_size': output_size, # 1 if one park
-        'sequence_length': sequence_length,
         'pred_sequence_length': pred_sequence_length,
-        'img_extraction_method': 'lenet',
-        'lenet_params': lenet_params
     }
     
     tcn = TCN(**tcn_params)
     
-    print(tcn)
+    print(tcn.tcn_stack.block1.residual)
+    net = tcn
+    params_in_network = 0
+    trainable_params_in_network = 0
+    for name, param in net.named_parameters():
+        if param.requires_grad:
+            trainable_params_in_network += len(np.ravel(param.data.cpu().numpy()))
+            print(name, param.data.numpy().shape)
+        params_in_network += len(np.ravel(param.data.cpu().numpy()))
     
-    x = torch.randn(batch_size, sequence_length, num_past_features)
+    #logging.info(f'Trainable parameters in network: {trainable_params_in_network}.')
+    #logging.info(f'Parameters in network: {params_in_network}.')
+    
+    '''x = torch.randn(batch_size, sequence_length, num_past_features)
     x_forecasts = torch.randn(batch_size, pred_sequence_length, num_unique_forecast_features)
     x_img = torch.randn(batch_size, sequence_length, 100, 100)
     
-    print(tcn(x, x_forecasts, x_img).shape)
+    print(tcn(x, x_forecasts, x_img).shape)'''
     

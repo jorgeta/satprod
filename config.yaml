@@ -5,7 +5,7 @@ train_on_one_batch: False
 
 data_config:
   parks: ['skom'] # ['bess', 'vals','skom','yvik']
-  numerical_features: ['production'] #['production', 'speed', 'direction', 'temporal']
+  numerical_features: ['production', 'speed', 'direction', 'temporal'] #['production', 'speed', 'direction', 'temporal']
   use_img_features: False
   img_extraction_method: 'resnet' # 'lenet', 'resnet', 'vgg'
   
@@ -51,7 +51,7 @@ models:
     num_layers: 1
     dropout: 0.2 # 0.2 0.3 0.4
   tcn:
-    channels: [32, 32, 32, 32] # 1-4
+    channels: [32, 32] # 1-4
     kernel_size: 3 # 3-5
     dilation_base: 2 # 1-2
     dropout: 0.2 # 0-0.1-0.5
