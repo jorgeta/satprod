@@ -116,9 +116,6 @@ class TCN(nn.Module):
             else: 
                 x = x_img
         
-        print(x[0,:,:])
-        exit()
-        
         x = self.tcn_stack(x.transpose(1,2)).transpose(1, 2)
         
         if self.only_predict_future_values:
