@@ -111,10 +111,10 @@ class App:
             train_model(self.config)
         
     def evaluate(self):
-        model_name = 'MLR'
-        timestamp = '2021-07-12-15-21'
-        park = 'vals'
-        sorting = 'test'
+        model_name = 'TCN'
+        timestamp = '2021-07-13-06-29'
+        park = 'skom'
+        sorting = 'num'
         ModelEvaluation(timestamp=timestamp, model_name=model_name, park=park, sorting=sorting)
         
     def compare(self, park: str):
