@@ -1,7 +1,7 @@
 app: satprod
 
-model: 'LSTM' #'SIN', 'LSTM', 'TCN', 'TCN_Bai', 'MLR'
-train_on_one_batch: True
+model: 'TCN' #'SIN', 'LSTM', 'TCN', 'TCN_Bai', 'MLR'
+train_on_one_batch: False
 
 data_config:
   parks: ['skom'] # ['bess', 'vals','skom','yvik']
@@ -20,7 +20,7 @@ data_config:
 
 train_config:
   batch_size: 64
-  num_epochs: 25
+  num_epochs: 40
   learning_rate: 1.0e-3
   scheduler_gamma: 0.9
   random_seed: 0
