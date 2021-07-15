@@ -96,10 +96,11 @@ class App:
                     for kernel in kernel_combinations:
                         for dropout in dropout_combinations:
                             self.config.models.tcn.channels = channels
+                            #print(self.config.models.tcn.channels)
                             self.config.models.tcn.kernel_size = kernel['kernel_size']
                             self.config.models.tcn.dilation_base = kernel['dilation_base']
                             self.config.models.tcn.dropout = dropout
-                            
+                            print(self.config.models.tcn)
                             train_model(self.config)
         if crop is not None:
             self.config.data_config.crop_image = crop
