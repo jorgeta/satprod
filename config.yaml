@@ -1,6 +1,6 @@
 app: satprod
 
-model: 'TCN' #'SIN', 'LSTM', 'TCN', 'TCN_Bai', 'MLR'
+model: 'LSTM' #'SIN', 'LSTM', 'TCN', 'TCN_Bai', 'MLR'
 train_on_one_batch: False
 
 data_config:
@@ -20,7 +20,7 @@ data_config:
 
 train_config:
   batch_size: 64
-  num_epochs: 40
+  num_epochs: 25
   learning_rate: 1.0e-3
   scheduler_gamma: 0.9
   random_seed: 0

@@ -93,7 +93,7 @@ def train_loop(net, train_config: TrainConfig, data_config: DataConfig, data: Wi
     for name, param in net.named_parameters():
         if param.requires_grad:
             trainable_params_in_network += len(np.ravel(param.data.cpu().numpy()))
-            #print(name, param.data.numpy().shape)
+            #logging.info(name, param.data.numpy().shape)
         params_in_network += len(np.ravel(param.data.cpu().numpy()))
     
     logging.info(f'Trainable parameters in network: {trainable_params_in_network}.')
