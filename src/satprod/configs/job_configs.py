@@ -55,7 +55,7 @@ class DataConfig():
         self.test_start = datetime(**self.test_start)
         self.test_end = datetime(**self.test_end)
         
-        if self.use_img_features and (self.model=='TCN' or self.model=='TCN_Bai'):
+        if self.use_img_features and self.model=='TCN':
             self.use_img_forecasts = True
         
         if not self.use_img_features: 

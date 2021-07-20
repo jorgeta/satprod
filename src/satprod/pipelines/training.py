@@ -16,7 +16,6 @@ from satprod.pipelines.dataset import WindDataset
 
 from satprod.ml.lstm import LSTM
 from satprod.ml.tcn import TCN
-from satprod.ml.tcn_bai import TCN_Bai
 from satprod.ml.mlr import MLR
 from satprod.ml.sin import SIN
 
@@ -303,7 +302,7 @@ def train_loop(net, train_config: TrainConfig, data_config: DataConfig, data: Wi
             
             # compute gradients given loss
             y_prod = data_dict['y_prod']
-            if data_config.model=='TCN_Bai' or data_config.model=='TCN':
+            if data_config.model=='TCN':
                 if not net.only_predict_future_values:
                     y_prod = torch.cat([X_prod[:, pred_sequence_length:, :], data_dict['y_prod']], dim=1)
             
@@ -590,15 +589,6 @@ def init_data_and_model(config):
         'only_predict_future_values': config.models.tcn.only_predict_future_values
     }
     
-    tcn_bai_params = {
-        'input_size': wind_dataset.n_past_features, 
-        'output_size': wind_dataset.n_output_features,
-        'channels': config.models.tcn_bai.channels, 
-        'kernel_size': config.models.tcn_bai.kernel_size, 
-        'dropout': config.models.tcn_bai.dropout,
-        'pred_sequence_length': data_config.pred_sequence_length
-    }
-    
     mlr_params = {
         'num_past_features': wind_dataset.n_past_features, 
         'output_size': wind_dataset.n_output_features,
@@ -622,8 +612,6 @@ def init_data_and_model(config):
         net = TCN(**tcn_params)
     elif config.model=='LSTM':
         net = LSTM(**lstm_params)
-    elif config.model=='TCN_Bai':
-        net = TCN_Bai(**tcn_bai_params)
     elif config.model=='MLR':
         net = MLR(**mlr_params)
     elif config.model=='SIN':

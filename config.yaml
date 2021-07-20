@@ -1,6 +1,6 @@
 app: satprod
 
-model: 'TCN' #'SIN', 'LSTM', 'TCN', 'TCN_Bai', 'MLR'
+model: 'TCN' #'SIN', 'LSTM', 'TCN', 'MLR'
 train_on_one_batch: False
 
 data_config:
