@@ -116,7 +116,6 @@ def store_results(
         pickle.dump(info, storage_file)
         
     # test evaluation and write plots
-    
     modelEval = ModelEvaluation(timestamp, model.name, park, sorting)
 
 class ModelEvaluation():
@@ -210,6 +209,7 @@ class ModelEvaluation():
                 -1, self.data_config.pred_sequence_length, len(self.target_label_indices))
     
     def info(self, to_console: bool=False):
+        
         info_str = f'\nTimestamp: {self.timestamp}\nPark: {self.park}\nModel: {self.model_name}'
         info_str = f'\nTrainable parameters in network: {self.results.trainable_params_in_network}'
         info_str += f'\nParameters in network: {self.results.params_in_network}'

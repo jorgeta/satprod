@@ -10,7 +10,7 @@ from sklearn.metrics import mean_absolute_error
 
 from tasklog.tasklogger import logging
 
-'''plt.rcParams.update({
+plt.rcParams.update({
     "text.usetex": True,
     "font.family": "sans-serif",
     "font.sans-serif": ["Helvetica"]})
@@ -39,7 +39,7 @@ plt.rc('xtick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
 plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
 plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
 plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
-'''
+
 class ModelComparison():
     
     def __init__(self, park: str, config):
@@ -64,7 +64,8 @@ class ModelComparison():
             
             try:
                 self.eval_dict[key] = ModelEvaluation(**value)
-            except:
+            except Exception as e:
+                logging.info(e)
                 logging.info(f'Unable to evaluate {value}.')
                 continue
         
@@ -85,6 +86,9 @@ class ModelComparison():
         self.baseline_comparisons('train')
         self.baseline_comparisons('valid')
         self.baseline_comparisons('test')
+        
+        self.compare_LSTM_information()
+        self.compare_TCN_information()
         
     def benchmark(self):
         with open(f'{self.TE_data_path}/TE_predictions.pickle', 'rb') as model_file:
@@ -173,7 +177,7 @@ class ModelComparison():
                 else:
                     models[f'{model.model_name} ({model.timestamp})'] = model.test_error_matrix
         
-        width = 0.1  # the width of the bars
+        width = 0.05  # the width of the bars
         labels = ['+1h', '+2h', '+3h', '+4h', '+5h']
 
         x_axis = []
@@ -200,3 +204,83 @@ class ModelComparison():
         ax.legend(loc='upper left')
         plt.tight_layout()
         plt.savefig(f'{self.comparison_storage_path}/{dataset_name}_comparison.png')
+        
+    def compare_LSTM_information(self):
+        df = pd.DataFrame()
+        
+        lowest_valid_maes = []
+        features_used = []
+        params_in_networks = []
+        trainable_params_in_networks = []
+        linear_sizes = []
+        hidden_sizes = []
+        sequence_lengths = []
+        
+        for model_id, model in self.eval_dict.items():
+            if model.model_name!='LSTM': continue
+            features_used.append(model.data_config.numerical_features)
+            trainable_params_in_networks.append(model.results.trainable_params_in_network)
+            params_in_networks.append(model.results.params_in_network)
+            lowest_valid_maes.append(model.results.lowest_valid_mae)
+            for key, value in vars(model.net).items():
+                if not key.startswith('_') and key!='training':
+                    if key=='linear_size':
+                        linear_sizes.append(value)
+                    if key=='hidden_size':
+                        hidden_sizes.append(value)
+                    if key=='sequence_length':
+                        sequence_lengths.append(value)
+        
+        df['lowest_valid_mae'] = lowest_valid_maes
+        df['features'] = features_used
+        df['params_in_network'] = params_in_networks
+        df['trainable_params_in_network'] = trainable_params_in_networks
+        df['linear_size'] = linear_sizes
+        df['hidden_size'] = hidden_sizes
+        df['sequence_length'] = sequence_lengths
+        
+        logging.info(df)
+        
+        df.to_csv(f'{self.comparison_storage_path}/lstm_comparison.csv')
+        
+    def compare_TCN_information(self):
+        df = pd.DataFrame()
+        
+        lowest_valid_maes = []
+        features_used = []
+        params_in_networks = []
+        trainable_params_in_networks = []
+        channel_list = []
+        kernel_sizes = []
+        dropouts = []
+        sequence_lengths = []
+        
+        for model_id, model in self.eval_dict.items():
+            if model.model_name!='TCN': continue
+            features_used.append(model.data_config.numerical_features)
+            trainable_params_in_networks.append(model.results.trainable_params_in_network)
+            params_in_networks.append(model.results.params_in_network)
+            lowest_valid_maes.append(model.results.lowest_valid_mae)
+            for key, value in vars(model.net).items():
+                if not key.startswith('_') and key!='training':
+                    if key=='channels':
+                        channel_list.append(value)
+                    if key=='kernel_size':
+                        kernel_sizes.append(value)
+                    if key=='dropout':
+                        dropouts.append(value)
+                    if key=='sequence_length':
+                        sequence_lengths.append(value)
+        
+        df['lowest_valid_mae'] = lowest_valid_maes
+        df['features'] = features_used
+        df['params_in_network'] = params_in_networks
+        df['trainable_params_in_network'] = trainable_params_in_networks
+        df['channels'] = channel_list
+        df['kernel_size'] = kernel_sizes
+        df['dropout'] = dropouts
+        df['sequence_length'] = sequence_lengths
+        
+        logging.info(df)
+        
+        df.to_csv(f'{self.comparison_storage_path}/tcn_comparison.csv')

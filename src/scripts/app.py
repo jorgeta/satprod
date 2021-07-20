@@ -27,7 +27,6 @@ class App:
         cd = str(os.path.dirname(os.path.abspath(__file__)))
         self.root = f'{cd}/../..'
         self.config = read_yaml(f'{self.root}/config.yaml')
-
         logging.info(f'Running {self.config.app}')
 
         self.step = 1
@@ -111,15 +110,15 @@ class App:
             train_model(self.config)
         
     def evaluate(self):
-        model_name = 'TCN'
-        timestamp = '2021-07-13-06-29'
+        model_name = 'LSTM'
+        timestamp = '2021-06-14-02-03'
         park = 'skom'
         sorting = 'num'
         ModelEvaluation(timestamp=timestamp, model_name=model_name, park=park, sorting=sorting)
         
     def compare(self, park: str):
         ModelComparison(park, self.config.comparison)
-    
+
     def satellite_video(self, date: datetime=datetime(2019,6,3), play=False):
         """Create and save satvid with name giving information about the test.
 
