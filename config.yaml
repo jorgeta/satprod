@@ -1,6 +1,6 @@
 app: satprod
 
-model: 'LSTM' #'SIN', 'LSTM', 'TCN', 'TCN_Bai', 'MLR'
+model: 'TCN' #'SIN', 'LSTM', 'TCN', 'TCN_Bai', 'MLR'
 train_on_one_batch: False
 
 data_config:
@@ -51,15 +51,11 @@ models:
     num_layers: 1
     dropout: 0.2 # 0.2 0.3 0.4
   tcn:
-    channels: [32, 32, 32, 32] # 1-4
+    channels: [32, 32] # 1-4
     kernel_size: 3 # 3-5
     dilation_base: 2 # 1-2
     dropout: 0.2 # 0-0.1-0.5
     only_predict_future_values: True
-  tcn_bai:
-    channels: [32, 32, 32]
-    kernel_size: 3
-    dropout: 0.0
   mlr:
     sequence_length: 3
   sin:
