@@ -5,7 +5,7 @@ train_on_one_batch: False
 
 data_config:
   parks: ['skom'] # ['bess', 'vals','skom','yvik']
-  numerical_features: ['production', 'speed', 'direction', 'temporal'] #['production', 'speed', 'direction', 'temporal']
+  numerical_features: ['production', 'speed', 'direction'] #['production', 'speed', 'direction', 'temporal']
   use_img_features: False
   img_extraction_method: 'resnet' # 'lenet', 'resnet', 'vgg'
   
@@ -20,7 +20,7 @@ data_config:
 
 train_config:
   batch_size: 64
-  num_epochs: 25
+  num_epochs: 40
   learning_rate: 1.0e-3
   scheduler_gamma: 0.9
   random_seed: 0
@@ -47,7 +47,7 @@ models:
   lstm:
     sequence_length: 5 # 5 13 29 61
     hidden_size: 64 # 32 48 64
-    linear_size: 128 # 64 128 256
+    linear_size: 256 # 64 128 256
     num_layers: 1
     dropout: 0.2 # 0.2 0.3 0.4
   tcn:
