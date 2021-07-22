@@ -5,6 +5,7 @@ import os
 import pickle
 from sklearn.linear_model import LinearRegression
 from satprod.configs.config_utils import read_yaml
+from numpy import loadtxt
 
 from satprod.data_handlers.data_utils import (
     sin_transform, 
@@ -29,6 +30,7 @@ class NumericalDataHandler():
         self.old_formatted_data_path = f'{self.root}/data/old_data/formatted'
         self.formatted_data_path = f'{self.root}/data/formatted'
         self.benchmark_data_path = f'{self.root}/data/prod_forecasts'
+        self.SIN_vals_predictions_path = f'{self.root}/storage/vals/SIN/img/2021-07-21-13-59'
         
         os.makedirs(f'{self.raw_prod_data_path}', exist_ok=True)
         os.makedirs(f'{self.raw_wind_data_path}', exist_ok=True)
@@ -75,6 +77,47 @@ class NumericalDataHandler():
             for i in range(1, self.pred_horizon+1):
                 df[f'{col}+{i}h'] = df[col].shift(periods=-i)
         
+        sin_train_preds = np.array(loadtxt(f'{self.SIN_vals_predictions_path}/corr_train_preds.csv', delimiter=','))
+        with open(f'{self.SIN_vals_predictions_path}/model_results_config.pickle', 'rb') as storage_file:
+            net, results, train_config, data_config, scaler, target_label_indices = pickle.load(storage_file)
+        sin_valid_preds = np.array(results.best_val_preds).squeeze()
+        sin_test_preds = np.array(results.test_preds).squeeze()
+        
+        date_indices = []
+        file_object = open('storage/vals_prediction_times.txt', 'r')
+        while True:
+            line = file_object.readline()
+            if line=='': break
+            date = datetime.strptime(line[:-1], '%Y-%m-%d %H:%M:%S')
+            date_indices.append(date)
+        file_object.close()
+        
+        col_names = ['SIN_vals', 'SIN_vals+1h', 'SIN_vals+2h', 'SIN_vals+3h', 'SIN_vals+4h', 'SIN_vals+5h']
+        df_train = pd.DataFrame(
+            data=sin_train_preds, 
+            index=date_indices[:sin_train_preds.shape[0]],
+            columns=col_names
+        )
+        df_valid = pd.DataFrame(
+            data=sin_valid_preds, 
+            index=date_indices[sin_train_preds.shape[0]:sin_train_preds.shape[0]+sin_valid_preds.shape[0]],
+            columns=col_names
+        )
+        df_test = pd.DataFrame(
+            data=sin_test_preds, 
+            index=date_indices[sin_train_preds.shape[0]+sin_valid_preds.shape[0]:],
+            columns=col_names
+        )
+        
+        df_SIN = pd.concat(
+            [df_train, df_valid, df_test], axis=0
+        ).asfreq('H')
+        df_SIN.index.name = 'time'
+        
+        df = pd.concat(
+            [df, df_SIN], axis=1
+        )
+        
         self.write_formatted_data(df, nan=True)
         
         # fill isolated missing values
@@ -87,7 +130,9 @@ class NumericalDataHandler():
         for col in get_columns(df, 'temporal').columns:
             for i in range(1, self.pred_horizon+1):
                 df[f'{col}+{i}h'] = df[col].shift(periods=-i)
-        
+        df = pd.concat(
+            [df, df_SIN], axis=1
+        )
         self.write_formatted_data(df, nan=False)
     
     def write_formatted_data(self, df: pd.DataFrame, nan: bool):

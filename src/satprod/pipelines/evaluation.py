@@ -8,6 +8,14 @@ from sklearn.metrics import mean_absolute_error
 from matplotlib import pyplot as plt
 import pickle
 from numpy import savetxt, loadtxt
+import PIL
+import torch.nn.functional as F
+import torchvision.models as models
+from torchvision import transforms
+from torchvision.utils import make_grid, save_image
+from gradcam.utils import visualize_cam
+from gradcam import GradCAM, GradCAMpp
+import cv2
 
 from satprod.configs.config_utils import TimeInterval
 from satprod.configs.job_configs import TrainConfig, DataConfig
@@ -15,7 +23,7 @@ from satprod.pipelines.dataset import WindDataset
 from satprod.data_handlers.data_utils import get_columns
 
 from tasklog.tasklogger import logging
-'''
+
 plt.rcParams.update({
     "text.usetex": True,
     "font.family": "sans-serif",
@@ -45,7 +53,7 @@ plt.rc('xtick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
 plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
 plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
 plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
-'''
+
 @dataclass
 class Results():
     params_in_network: int
@@ -136,7 +144,67 @@ class ModelEvaluation():
         }
         
         self.get_stored_results()
+        
+        
+        
+        '''logging.info('Starting gradcam')
+        
+        img_dir = f'{self.root}/data/img/grid/2019/04/11'
+        # img_name = 'collies.JPG'
+        # img_name = 'multiple_dogs.jpg'
+        # img_name = 'snake.JPEG'
+        img_name = '17;00;00.png'
+        img_path = os.path.join(img_dir, img_name)
+
+        img = cv2.imread(img_path, 1)
+        #img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        pil_img = PIL.Image.fromarray(img)
+        #pil_img = PIL.Image.open(img_path)
+        
+        torch_img = transforms.Compose([
+            transforms.Resize((224, 224)),
+            transforms.ToTensor()
+        ])(pil_img).to('cpu')
+        normed_torch_img = transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])(torch_img)[None]
+        
+        configs = [
+            dict(model_type='resnet', arch=self.net.resnet.resnet18, layer_name='layer4'),
+        ]
+        for config in configs:
+            config['arch'].to('cpu').eval()
+
+        cams = [
+            [cls.from_config(**config) for cls in (GradCAM, GradCAMpp)] for config in configs
+        ]
+        
+        images = []
+        for gradcam, gradcam_pp in cams:
+            mask, _ = gradcam(normed_torch_img)
+            heatmap, result = visualize_cam(mask, torch_img)
+
+            mask_pp, _ = gradcam_pp(normed_torch_img)
+            heatmap_pp, result_pp = visualize_cam(mask_pp, torch_img)
+            
+            images.extend([torch_img.cpu(), heatmap, heatmap_pp, result, result_pp])
+            
+        grid_image = make_grid(images, nrow=5)
+        
+        plt.imshow(transforms.ToPILImage()(grid_image))
+        plt.show()
+        exit()'''
+        
+        if np.array(self.results.corr_train_preds).shape[1]==6:
+            self.results.corr_train_preds = np.array(self.results.corr_train_preds)[:, -5:, :]
+            self.results.train_targs = np.array(self.results.train_targs)[:, -5:, :]
+            self.results.best_val_preds = np.array(self.results.best_val_preds)[:, -5:, :]
+            self.results.val_targs = np.array(self.results.val_targs)[:, -5:, :]
+            self.results.test_preds = np.array(self.results.test_preds)[:, -5:, :]
+            self.results.test_targs = np.array(self.results.test_targs)[:, -5:, :]
+            
+            self.data_config.pred_sequence_length -= 1
         try:
+            if self.results.train_preds.shape[1]==6:
+                self.results.train_preds = self.results.train_preds[:, -5:, :]
             self.train_preds_unscaled, self.train_targs_unscaled = self.unscale_predictions(
                 self.results.train_preds, 
                 self.results.train_targs
@@ -292,7 +360,7 @@ class ModelEvaluation():
             axis[i].set_xlabel('hours ahead')
             axis[i].set_ylabel('MAE')
             axis[i].set_xticks(range(error_matrix.shape[0]))
-            if self.train_config.predict_current_time:
+            if self.data_config.pred_sequence_length==6:
                 axis[i].set_xticklabels([f'{h}' for h in range(error_matrix.shape[0])])
             else:
                 axis[i].set_xticklabels([f'{h+1}' for h in range(error_matrix.shape[0])])
@@ -301,7 +369,7 @@ class ModelEvaluation():
     
     def plot_fitting_example(self, preds_unscaled, targs_unscaled, dataset_name: str):
         
-        if self.train_config.predict_current_time:
+        if self.data_config.pred_sequence_length==6:
             index = 0
         else:
             index = 1
@@ -317,7 +385,7 @@ class ModelEvaluation():
                 plt.plot(np.ravel(np.array(targs_unscaled)[:n_samples_shown, i, j]), label='targets')
                 plt.plot(np.ravel(np.array(preds_unscaled)[:n_samples_shown, i, j]), label='predicitions')
                 
-                if self.train_config.predict_current_time:
+                if self.data_config.pred_sequence_length==6:
                     plt.title(f'{i}h ahead at {self.park_name[self.data_config.parks[j]]}, {dataset_name} set')
                 else:
                     plt.title(f'{i+1}h ahead at {self.park_name[self.data_config.parks[j]]}, {dataset_name} set')

@@ -51,9 +51,10 @@ class WindDataset(torch.utils.data.Dataset):
                 park_data.append(get_columns(self.num_data, park))
         
         num_data_only_parks = pd.concat(park_data, axis=1)
+        
         self.num_data = pd.concat([num_data_only_parks, get_columns(self.num_data, 'temporal')], axis=1)
         
-        for feature_type in ['speed', 'direction', 'temporal']:
+        for feature_type in ['speed', 'direction', 'temporal', 'SIN_vals']:
             if feature_type not in self.numerical_features:
                 self.num_data = self.num_data.drop(columns=get_columns(self.num_data, feature_type).columns.values)
         if not self.use_numerical_forecasts:
@@ -70,7 +71,9 @@ class WindDataset(torch.utils.data.Dataset):
                 else:
                     self.num_data = self.num_data.drop(columns=columns_to_drop)
                     hour += 1
-                
+        #if not self.use_SIN_predictions or (self.parks!=['vals']):
+        #    col_names = get_columns(self.num_data,'SIN_vals').columns.values
+        #    self.num_data = self.num_data.drop(columns=col_names)
         
         # target labels
         self.target_labels = list(get_columns(self.num_data, 'production').columns)

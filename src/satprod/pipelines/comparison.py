@@ -90,6 +90,7 @@ class ModelComparison():
         
         self.compare_LSTM_information()
         self.compare_TCN_information()
+        self.compare_SIN_information()
         
     def benchmark(self):
         with open(f'{self.TE_data_path}/TE_predictions.pickle', 'rb') as model_file:
@@ -285,3 +286,43 @@ class ModelComparison():
         logging.info(df)
         
         df.to_csv(f'{self.comparison_storage_path}/tcn_comparison.csv')
+        
+    def compare_SIN_information(self):
+        df = pd.DataFrame()
+        
+        lowest_valid_maes = []
+        features_used = []
+        params_in_networks = []
+        trainable_params_in_networks = []
+        crops = []
+        weight_decays = []
+        
+        for model_id, model in self.eval_dict.items():
+            if model.model_name!='SIN': continue
+            features_used.append(model.data_config.numerical_features)
+            trainable_params_in_networks.append(model.results.trainable_params_in_network)
+            params_in_networks.append(model.results.params_in_network)
+            lowest_valid_maes.append(model.results.lowest_valid_mae)
+            weight_decays.append(model.train_config.weight_decay)
+            crops.append(model.data_config.crop_image)
+            '''for key, value in vars(model.net).items():
+                if not key.startswith('_') and key!='training':
+                    if key=='channels':
+                        channel_list.append(value)
+                    if key=='kernel_size':
+                        kernel_sizes.append(value)
+                    if key=='dropout':
+                        dropouts.append(value)
+                    if key=='sequence_length':
+                        sequence_lengths.append(value)'''
+        
+        df['lowest_valid_mae'] = lowest_valid_maes
+        df['features'] = features_used
+        df['params_in_network'] = params_in_networks
+        df['trainable_params_in_network'] = trainable_params_in_networks
+        df['weight_decay'] = weight_decays
+        df['crop'] = crops
+        
+        logging.info(df)
+        
+        df.to_csv(f'{self.comparison_storage_path}/sin_comparison.csv')

@@ -37,7 +37,14 @@ class App:
         
         self.num = NumericalDataHandler()
         
-    def train(self, dropout=None, weight_decay=None, crop=None, parameter_tuning: bool=False, feature_selection: bool=False):
+    def train(self, 
+            model: bool = None,
+            use_SIN: bool = None,
+            dropout=None, 
+            weight_decay=None, 
+            crop=None, 
+            parameter_tuning: bool=False, 
+            feature_selection: bool=False):
         if feature_selection:
             
             numerical_feature_combinations = [
@@ -106,14 +113,24 @@ class App:
             self.config.models.sin.dropout = dropout
         if weight_decay is not None:
             self.config.train_config.weight_decay = weight_decay
+        
+        if model is not None:
+            self.config.model=model
+        if use_SIN is not None:
+            if use_SIN:
+                self.config.data_config.numerical_features = ['production', 'speed', 'direction', 'SIN_vals']
+            else:
+                self.config.data_config.numerical_features = ['production', 'speed', 'direction']
+        
         if not parameter_tuning and not feature_selection:
             train_model(self.config)
         
     def evaluate(self):
-        model_name = 'LSTM'
-        timestamp = '2021-06-14-02-03'
-        park = 'skom'
-        sorting = 'num'
+        #{'timestamp': '2021-07-21-13-58', 'model_name': 'SIN', 'sorting': 'img'}
+        model_name = 'SIN'
+        timestamp = '2021-07-21-13-59' # '2021-07-21-13-58', '2021-07-21-13-59'
+        park = 'vals'
+        sorting = 'img'
         ModelEvaluation(timestamp=timestamp, model_name=model_name, park=park, sorting=sorting)
         
     def compare(self, park: str):

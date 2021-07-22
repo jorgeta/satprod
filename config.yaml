@@ -1,18 +1,18 @@
 app: satprod
 
-model: 'TCN' #'SIN', 'LSTM', 'TCN', 'MLR'
-train_on_one_batch: False
+model: 'LSTM' #'SIN', 'LSTM', 'TCN', 'MLR'
+train_on_one_batch: True
 
 data_config:
-  parks: ['skom'] # ['bess', 'vals','skom','yvik']
-  numerical_features: ['production', 'speed', 'direction'] #['production', 'speed', 'direction', 'temporal']
+  parks: ['vals'] # ['bess', 'vals','skom','yvik']
+  numerical_features: ['production', 'speed', 'direction', 'SIN_vals'] #['production', 'speed', 'direction', 'temporal', 'SIN_vals']
   use_img_features: False
   img_extraction_method: 'resnet' # 'lenet', 'resnet', 'vgg'
   
   pred_sequence_length: 5 # if changing, run 'satprod num update_formatted_files'
   use_numerical_forecasts: True
   use_img_forecasts: False
-  crop_image: True
+  crop_image: False
   
   valid_start: {'year': 2019, 'month': 5, 'day': 12, 'hour': 0}
   test_start: {'year': 2020, 'month': 5, 'day': 12, 'hour': 0}
@@ -20,11 +20,11 @@ data_config:
 
 train_config:
   batch_size: 64
-  num_epochs: 40
+  num_epochs: 60 # if LSTM or TCN: 60
   learning_rate: 1.0e-3
   scheduler_gamma: 0.9
   random_seed: 0
-  weight_decay: 0.0 # 0.001, 0.0001, 0.00001
+  weight_decay: 1.0e-09 # 0.001, 0.0001, 0.00001 if LSTM or TCN: 1e-09
   predict_current_time: False
 
 img_extraction_methods:
@@ -38,7 +38,7 @@ img_extraction_methods:
     padding_pool: [0, 0]
   resnet:
     output_size: 256
-    freeze_all_but_last_layer: False
+    freeze_all_but_last_layer: True
   vgg:
     output_size: 256
     freeze_all_but_last_layer: True
@@ -65,6 +65,7 @@ models:
 comparison: # {'timestamp': , 'model_name': , 'sorting': 'num'}
   skom: 
     model1: {'timestamp': '2021-06-13-06-27', 'model_name': 'MLR', 'sorting': 'num'}
+    model2: {'timestamp': '2021-07-22-06-20', 'model_name': 'LSTM', 'sorting': 'num'}
     #model3: {'timestamp': '2021-06-14-13-02', 'model_name': 'TCN', 'sorting': 'num'}
     #model4: {'timestamp': '2021-06-15-21-27', 'model_name': 'TCN', 'sorting': 'num'}
     #model8: {'timestamp': 2021-06-14-02-03, 'model_name': 'LSTM', 'sorting': 'num'}
@@ -249,6 +250,30 @@ comparison: # {'timestamp': , 'model_name': , 'sorting': 'num'}
     model4: {'timestamp': '2021-06-16-12-58', 'model_name': 'TCN', 'sorting': 'num'}
     model5:
     model6:
+    #model13: {'timestamp': '2021-07-21-13-23', 'model_name': 'SIN', 'sorting': 'img'}
+    #model14: {'timestamp': '2021-07-21-13-54', 'model_name': 'SIN', 'sorting': 'img'}
+    #model15: {'timestamp': '2021-07-21-14-19', 'model_name': 'SIN', 'sorting': 'img'}
+    #model16: {'timestamp': '2021-07-21-15-01', 'model_name': 'SIN', 'sorting': 'img'}
+    #model19: {'timestamp': '2021-07-21-13-07', 'model_name': 'SIN', 'sorting': 'img'}
+    #model20: {'timestamp': '2021-07-21-13-34', 'model_name': 'SIN', 'sorting': 'img'}
+    #model21: {'timestamp': '2021-07-21-13-56', 'model_name': 'SIN', 'sorting': 'img'}
+    #model22: {'timestamp': '2021-07-21-14-48', 'model_name': 'SIN', 'sorting': 'img'}
+    #model23: {'timestamp': '2021-07-21-15-06', 'model_name': 'SIN', 'sorting': 'img'}
+    #model26: {'timestamp': '2021-07-21-13-08', 'model_name': 'SIN', 'sorting': 'img'}
+    #model27: {'timestamp': '2021-07-21-13-48', 'model_name': 'SIN', 'sorting': 'img'}
+    #model28: {'timestamp': '2021-07-21-13-57', 'model_name': 'SIN', 'sorting': 'img'}
+    #model29: {'timestamp': '2021-07-21-14-50', 'model_name': 'SIN', 'sorting': 'img'}
+    #model30: {'timestamp': '2021-07-21-15-07', 'model_name': 'SIN', 'sorting': 'img'}
+    #model33: {'timestamp': '2021-07-21-13-12', 'model_name': 'SIN', 'sorting': 'img'}
+    #model34: {'timestamp': '2021-07-21-13-50', 'model_name': 'SIN', 'sorting': 'img'}
+    model35: {'timestamp': '2021-07-21-13-58', 'model_name': 'SIN', 'sorting': 'img'}
+    #model36: {'timestamp': '2021-07-21-14-53', 'model_name': 'SIN', 'sorting': 'img'}
+    #model37: {'timestamp': '2021-07-21-15-08', 'model_name': 'SIN', 'sorting': 'img'}
+    #model40: {'timestamp': '2021-07-21-13-20', 'model_name': 'SIN', 'sorting': 'img'}
+    #model41: {'timestamp': '2021-07-21-13-52', 'model_name': 'SIN', 'sorting': 'img'}
+    #model42: {'timestamp': '2021-07-21-13-59', 'model_name': 'SIN', 'sorting': 'img'}
+    #model43: {'timestamp': '2021-07-21-14-59', 'model_name': 'SIN', 'sorting': 'img'}
+    #model44: {'timestamp': '2021-07-21-15-11', 'model_name': 'SIN', 'sorting': 'img'}
   yvik:
     model1: {'timestamp': '2021-06-13-07-52', 'model_name': 'MLR', 'sorting': 'num'}
     model2: {'timestamp': '2021-06-14-07-00', 'model_name': 'LSTM', 'sorting': 'num'}
