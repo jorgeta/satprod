@@ -1,16 +1,16 @@
 app: satprod
 
-model: 'LSTM' #'SIN', 'LSTM', 'TCN', 'MLR'
+model: 'SIN' #'SIN', 'LSTM', 'TCN', 'MLR'
 train_on_one_batch: False
 
 data_config:
   parks: ['vals'] # ['bess', 'vals','skom','yvik']
-  numerical_features: ['production', 'speed', 'direction', 'SIN_vals'] #['production', 'speed', 'direction', 'temporal', 'SIN_vals']
+  numerical_features: ['speed'] #['production', 'speed', 'direction', 'temporal', 'SIN_vals']
   use_img_features: False
   img_extraction_method: 'resnet' # 'lenet', 'resnet', 'vgg'
   
   pred_sequence_length: 5 # if changing, run 'satprod num update_formatted_files'
-  use_numerical_forecasts: True
+  use_numerical_forecasts: False
   use_img_forecasts: False
   crop_image: False
   
@@ -20,12 +20,12 @@ data_config:
 
 train_config:
   batch_size: 64
-  num_epochs: 60 # if LSTM or TCN: 60
+  num_epochs: 20 # if LSTM or TCN: 60
   learning_rate: 1.0e-3
   scheduler_gamma: 0.9
   random_seed: 0
-  weight_decay: 1.0e-09 # 0.001, 0.0001, 0.00001 if LSTM or TCN: 1e-09
-  predict_current_time: False
+  weight_decay: 0.0 #1.0e-09 # 0.001, 0.0001, 0.00001 if LSTM or TCN: 1e-09
+  predict_current_time: True
 
 img_extraction_methods:
   lenet:
@@ -45,11 +45,11 @@ img_extraction_methods:
 
 models:
   lstm:
-    sequence_length: 5 # 5 13 29 61
-    hidden_size: 64 # 32 48 64
-    linear_size: 256 # 64 128 256
+    sequence_length: 1 # 5 # 5 13 29 61
+    hidden_size: 8 # 64 # 32 48 64
+    linear_size: 4 # 256 # 64 128 256
     num_layers: 1
-    dropout: 0.2 # 0.2 0.3 0.4
+    dropout: 0.0 # 0.2 # 0.2 0.3 0.4
   tcn:
     channels: [64, 64] # 1-4
     kernel_size: 3 # 3-5
@@ -57,15 +57,15 @@ models:
     dropout: 0.2 # 0-0.1-0.5
     only_predict_future_values: True
   mlr:
-    sequence_length: 3
+    sequence_length: 1
   sin:
-    dropout: 0.5 # 0.3, 0.5
+    dropout: 0.0 # 0.5 # 0.3, 0.5
     sequence_length: 1
 
 comparison: # {'timestamp': , 'model_name': , 'sorting': 'num'}
   skom: 
     model1: {'timestamp': '2021-06-13-06-27', 'model_name': 'MLR', 'sorting': 'num'}
-    model2: {'timestamp': '2021-07-22-06-20', 'model_name': 'LSTM', 'sorting': 'num'}
+    model2: #{'timestamp': '2021-07-22-06-20', 'model_name': 'LSTM', 'sorting': 'num'}
     #model3: {'timestamp': '2021-06-14-13-02', 'model_name': 'TCN', 'sorting': 'num'}
     #model4: {'timestamp': '2021-06-15-21-27', 'model_name': 'TCN', 'sorting': 'num'}
     #model8: {'timestamp': 2021-06-14-02-03, 'model_name': 'LSTM', 'sorting': 'num'}
@@ -152,141 +152,162 @@ comparison: # {'timestamp': , 'model_name': , 'sorting': 'num'}
     #model147: {'timestamp': '4721-07-18-19-57', 'model_name': 'LSTM', 'sorting': 'num'}
     #model148: {'timestamp': '4821-07-18-20-35', 'model_name': 'LSTM', 'sorting': 'num'}
     #model149: {'timestamp': '4921-07-18-20-40', 'model_name': 'LSTM', 'sorting': 'num'}
-    model150: {'timestamp': '2021-06-14-13-02', 'model_name': 'TCN', 'sorting': 'num'} 
-    model151: {'timestamp': '2021-07-03-23-38', 'model_name': 'TCN', 'sorting': 'num'} 
-    model152: {'timestamp': '2021-07-04-15-06', 'model_name': 'TCN', 'sorting': 'num'} 
-    model153: {'timestamp': '2021-07-05-14-34', 'model_name': 'TCN', 'sorting': 'num'} 
-    model154: {'timestamp': '2021-07-06-23-04', 'model_name': 'TCN', 'sorting': 'num'} 
-    model155: {'timestamp': '2021-07-09-03-25', 'model_name': 'TCN', 'sorting': 'num'} 
-    model156: {'timestamp': '2021-07-11-11-17', 'model_name': 'TCN', 'sorting': 'num'} 
-    model157: {'timestamp': '2021-07-13-13-39', 'model_name': 'TCN', 'sorting': 'num'} 
-    model158: {'timestamp': '2021-07-16-23-07', 'model_name': 'TCN', 'sorting': 'num'} 
-    model159: {'timestamp': '2021-07-18-17-25', 'model_name': 'TCN', 'sorting': 'num'}
-    model161: {'timestamp': '2021-06-15-21-27', 'model_name': 'TCN', 'sorting': 'num'} 
-    model162: {'timestamp': '2021-07-03-23-53', 'model_name': 'TCN', 'sorting': 'num'} 
-    model163: {'timestamp': '2021-07-04-21-12', 'model_name': 'TCN', 'sorting': 'num'} 
-    model164: {'timestamp': '2021-07-05-15-14', 'model_name': 'TCN', 'sorting': 'num'} 
-    model165: {'timestamp': '2021-07-07-00-20', 'model_name': 'TCN', 'sorting': 'num'} 
-    model166: {'timestamp': '2021-07-09-05-22', 'model_name': 'TCN', 'sorting': 'num'} 
-    model167: {'timestamp': '2021-07-11-13-31', 'model_name': 'TCN', 'sorting': 'num'} 
-    model168: {'timestamp': '2021-07-13-14-57', 'model_name': 'TCN', 'sorting': 'num'} 
-    model169: {'timestamp': '2021-07-16-23-29', 'model_name': 'TCN', 'sorting': 'num'} 
-    model170: {'timestamp': '2021-07-18-17-45', 'model_name': 'TCN', 'sorting': 'num'}
-    model171: {'timestamp': '2021-07-02-20-40', 'model_name': 'TCN', 'sorting': 'num'} 
-    model172: {'timestamp': '2021-07-04-00-09', 'model_name': 'TCN', 'sorting': 'num'} 
-    model173: {'timestamp': '2021-07-04-21-33', 'model_name': 'TCN', 'sorting': 'num'} 
-    model174: {'timestamp': '2021-07-05-23-45', 'model_name': 'TCN', 'sorting': 'num'} 
-    model175: {'timestamp': '2021-07-07-10-52', 'model_name': 'TCN', 'sorting': 'num'} 
-    model176: {'timestamp': '2021-07-09-16-26', 'model_name': 'TCN', 'sorting': 'num'} 
-    model177: {'timestamp': '2021-07-12-02-18', 'model_name': 'TCN', 'sorting': 'num'} 
-    model178: {'timestamp': '2021-07-13-22-10', 'model_name': 'TCN', 'sorting': 'num'} 
-    model179: {'timestamp': '2021-07-17-20-35', 'model_name': 'TCN', 'sorting': 'num'} 
-    model180: {'timestamp': '2021-07-18-23-40', 'model_name': 'TCN', 'sorting': 'num'}
-    model181: {'timestamp': '2021-07-03-00-31', 'model_name': 'TCN', 'sorting': 'num'} 
-    model182: {'timestamp': '2021-07-04-07-20', 'model_name': 'TCN', 'sorting': 'num'} 
-    model183: {'timestamp': '2021-07-04-21-50', 'model_name': 'TCN', 'sorting': 'num'} 
-    model184: {'timestamp': '2021-07-06-00-27', 'model_name': 'TCN', 'sorting': 'num'} 
-    model185: {'timestamp': '2021-07-07-11-57', 'model_name': 'TCN', 'sorting': 'num'} 
-    model186: {'timestamp': '2021-07-09-18-09', 'model_name': 'TCN', 'sorting': 'num'} 
-    model187: {'timestamp': '2021-07-12-04-36', 'model_name': 'TCN', 'sorting': 'num'} 
-    model188: {'timestamp': '2021-07-13-23-24', 'model_name': 'TCN', 'sorting': 'num'} 
-    model189: {'timestamp': '2021-07-17-20-47', 'model_name': 'TCN', 'sorting': 'num'} 
-    model190: {'timestamp': '2021-07-19-00-06', 'model_name': 'TCN', 'sorting': 'num'}
-    model191: {'timestamp': '2021-07-03-04-16', 'model_name': 'TCN', 'sorting': 'num'} 
-    model192: {'timestamp': '2021-07-04-07-37', 'model_name': 'TCN', 'sorting': 'num'} 
-    model193: {'timestamp': '2021-07-05-05-04', 'model_name': 'TCN', 'sorting': 'num'} 
-    model194: {'timestamp': '2021-07-06-01-27', 'model_name': 'TCN', 'sorting': 'num'} 
-    model195: {'timestamp': '2021-07-07-23-48', 'model_name': 'TCN', 'sorting': 'num'} 
-    model196: {'timestamp': '2021-07-10-06-22', 'model_name': 'TCN', 'sorting': 'num'} 
-    model197: {'timestamp': '2021-07-12-16-20', 'model_name': 'TCN', 'sorting': 'num'} 
-    model198: {'timestamp': '2021-07-14-06-21', 'model_name': 'TCN', 'sorting': 'num'} 
-    model199: {'timestamp': '2021-07-18-04-20', 'model_name': 'TCN', 'sorting': 'num'} 
-    model200: {'timestamp': '2021-07-19-05-52', 'model_name': 'TCN', 'sorting': 'num'}
-    model201: {'timestamp': '2021-07-03-07-52', 'model_name': 'TCN', 'sorting': 'num'} 
-    model202: {'timestamp': '2021-07-04-08-21', 'model_name': 'TCN', 'sorting': 'num'} 
-    model203: {'timestamp': '2021-07-05-05-34', 'model_name': 'TCN', 'sorting': 'num'} 
-    model204: {'timestamp': '2021-07-06-11-26', 'model_name': 'TCN', 'sorting': 'num'} 
-    model205: {'timestamp': '2021-07-08-01-36', 'model_name': 'TCN', 'sorting': 'num'} 
-    model206: {'timestamp': '2021-07-10-08-22', 'model_name': 'TCN', 'sorting': 'num'} 
-    model207: {'timestamp': '2021-07-12-18-12', 'model_name': 'TCN', 'sorting': 'num'} 
-    model208: {'timestamp': '2021-07-14-07-35', 'model_name': 'TCN', 'sorting': 'num'} 
-    model209: {'timestamp': '2021-07-18-04-31', 'model_name': 'TCN', 'sorting': 'num'} 
-    model210: {'timestamp': '2021-07-19-06-18', 'model_name': 'TCN', 'sorting': 'num'}
-    model211: {'timestamp': '2021-07-03-11-26', 'model_name': 'TCN', 'sorting': 'num'} 
-    model212: {'timestamp': '2021-07-04-14-19', 'model_name': 'TCN', 'sorting': 'num'} 
-    model213: {'timestamp': '2021-07-05-05-57', 'model_name': 'TCN', 'sorting': 'num'} 
-    model214: {'timestamp': '2021-07-06-12-14', 'model_name': 'TCN', 'sorting': 'num'} 
-    model215: {'timestamp': '2021-07-08-13-32', 'model_name': 'TCN', 'sorting': 'num'} 
-    model216: {'timestamp': '2021-07-10-20-37', 'model_name': 'TCN', 'sorting': 'num'} 
-    model217: {'timestamp': '2021-07-13-04-56', 'model_name': 'TCN', 'sorting': 'num'} 
-    model218: {'timestamp': '2021-07-14-14-39', 'model_name': 'TCN', 'sorting': 'num'} 
-    model219: {'timestamp': '2021-07-18-10-59', 'model_name': 'TCN', 'sorting': 'num'} 
-    model220: {'timestamp': '2021-07-19-12-04', 'model_name': 'TCN', 'sorting': 'num'}
-    model221: {'timestamp': '2021-07-03-15-16', 'model_name': 'TCN', 'sorting': 'num'} 
-    model222: {'timestamp': '2021-07-04-14-38', 'model_name': 'TCN', 'sorting': 'num'} 
-    model223: {'timestamp': '2021-07-05-13-59', 'model_name': 'TCN', 'sorting': 'num'} 
-    model224: {'timestamp': '2021-07-06-13-13', 'model_name': 'TCN', 'sorting': 'num'} 
-    model225: {'timestamp': '2021-07-08-15-25', 'model_name': 'TCN', 'sorting': 'num'} 
-    model226: {'timestamp': '2021-07-10-22-42', 'model_name': 'TCN', 'sorting': 'num'} 
-    model227: {'timestamp': '2021-07-13-06-29', 'model_name': 'TCN', 'sorting': 'num'} 
-    model228: {'timestamp': '2021-07-14-15-55', 'model_name': 'TCN', 'sorting': 'num'} 
-    model229: {'timestamp': '2021-07-18-11-01', 'model_name': 'TCN', 'sorting': 'num'} 
-    model230: {'timestamp': '2021-07-19-12-31', 'model_name': 'TCN', 'sorting': 'num'}
-    model231: {'timestamp': '2021-07-19-18-17', 'model_name': 'TCN', 'sorting': 'num'}
-    model232: {'timestamp': '2021-07-19-18-43', 'model_name': 'TCN', 'sorting': 'num'}
-    model233: {'timestamp': '2021-07-20-00-54', 'model_name': 'TCN', 'sorting': 'num'}
-    model234: {'timestamp': '2021-07-20-01-33', 'model_name': 'TCN', 'sorting': 'num'}
+    #model150: {'timestamp': '2021-06-14-13-02', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model151: {'timestamp': '2021-07-03-23-38', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model152: {'timestamp': '2021-07-04-15-06', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model153: {'timestamp': '2021-07-05-14-34', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model154: {'timestamp': '2021-07-06-23-04', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model155: {'timestamp': '2021-07-09-03-25', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model156: {'timestamp': '2021-07-11-11-17', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model157: {'timestamp': '2021-07-13-13-39', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model158: {'timestamp': '2021-07-16-23-07', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model159: {'timestamp': '2021-07-18-17-25', 'model_name': 'TCN', 'sorting': 'num'}
+    #model161: {'timestamp': '2021-06-15-21-27', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model162: {'timestamp': '2021-07-03-23-53', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model163: {'timestamp': '2021-07-04-21-12', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model164: {'timestamp': '2021-07-05-15-14', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model165: {'timestamp': '2021-07-07-00-20', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model166: {'timestamp': '2021-07-09-05-22', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model167: {'timestamp': '2021-07-11-13-31', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model168: {'timestamp': '2021-07-13-14-57', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model169: {'timestamp': '2021-07-16-23-29', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model170: {'timestamp': '2021-07-18-17-45', 'model_name': 'TCN', 'sorting': 'num'}
+    #model171: {'timestamp': '2021-07-02-20-40', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model172: {'timestamp': '2021-07-04-00-09', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model173: {'timestamp': '2021-07-04-21-33', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model174: {'timestamp': '2021-07-05-23-45', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model175: {'timestamp': '2021-07-07-10-52', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model176: {'timestamp': '2021-07-09-16-26', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model177: {'timestamp': '2021-07-12-02-18', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model178: {'timestamp': '2021-07-13-22-10', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model179: {'timestamp': '2021-07-17-20-35', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model180: {'timestamp': '2021-07-18-23-40', 'model_name': 'TCN', 'sorting': 'num'}
+    #model181: {'timestamp': '2021-07-03-00-31', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model182: {'timestamp': '2021-07-04-07-20', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model183: {'timestamp': '2021-07-04-21-50', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model184: {'timestamp': '2021-07-06-00-27', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model185: {'timestamp': '2021-07-07-11-57', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model186: {'timestamp': '2021-07-09-18-09', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model187: {'timestamp': '2021-07-12-04-36', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model188: {'timestamp': '2021-07-13-23-24', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model189: {'timestamp': '2021-07-17-20-47', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model190: {'timestamp': '2021-07-19-00-06', 'model_name': 'TCN', 'sorting': 'num'}
+    #model191: {'timestamp': '2021-07-03-04-16', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model192: {'timestamp': '2021-07-04-07-37', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model193: {'timestamp': '2021-07-05-05-04', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model194: {'timestamp': '2021-07-06-01-27', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model195: {'timestamp': '2021-07-07-23-48', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model196: {'timestamp': '2021-07-10-06-22', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model197: {'timestamp': '2021-07-12-16-20', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model198: {'timestamp': '2021-07-14-06-21', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model199: {'timestamp': '2021-07-18-04-20', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model200: {'timestamp': '2021-07-19-05-52', 'model_name': 'TCN', 'sorting': 'num'}
+    #model201: {'timestamp': '2021-07-03-07-52', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model202: {'timestamp': '2021-07-04-08-21', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model203: {'timestamp': '2021-07-05-05-34', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model204: {'timestamp': '2021-07-06-11-26', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model205: {'timestamp': '2021-07-08-01-36', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model206: {'timestamp': '2021-07-10-08-22', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model207: {'timestamp': '2021-07-12-18-12', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model208: {'timestamp': '2021-07-14-07-35', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model209: {'timestamp': '2021-07-18-04-31', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model210: {'timestamp': '2021-07-19-06-18', 'model_name': 'TCN', 'sorting': 'num'}
+    #model211: {'timestamp': '2021-07-03-11-26', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model212: {'timestamp': '2021-07-04-14-19', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model213: {'timestamp': '2021-07-05-05-57', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model214: {'timestamp': '2021-07-06-12-14', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model215: {'timestamp': '2021-07-08-13-32', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model216: {'timestamp': '2021-07-10-20-37', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model217: {'timestamp': '2021-07-13-04-56', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model218: {'timestamp': '2021-07-14-14-39', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model219: {'timestamp': '2021-07-18-10-59', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model220: {'timestamp': '2021-07-19-12-04', 'model_name': 'TCN', 'sorting': 'num'}
+    #model221: {'timestamp': '2021-07-03-15-16', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model222: {'timestamp': '2021-07-04-14-38', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model223: {'timestamp': '2021-07-05-13-59', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model224: {'timestamp': '2021-07-06-13-13', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model225: {'timestamp': '2021-07-08-15-25', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model226: {'timestamp': '2021-07-10-22-42', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model227: {'timestamp': '2021-07-13-06-29', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model228: {'timestamp': '2021-07-14-15-55', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model229: {'timestamp': '2021-07-18-11-01', 'model_name': 'TCN', 'sorting': 'num'} 
+    #model230: {'timestamp': '2021-07-19-12-31', 'model_name': 'TCN', 'sorting': 'num'}
+    #model231: {'timestamp': '2021-07-19-18-17', 'model_name': 'TCN', 'sorting': 'num'}
+    #model232: {'timestamp': '2021-07-19-18-43', 'model_name': 'TCN', 'sorting': 'num'}
+    #model233: {'timestamp': '2021-07-20-00-54', 'model_name': 'TCN', 'sorting': 'num'}
+    #model234: {'timestamp': '2021-07-20-01-33', 'model_name': 'TCN', 'sorting': 'num'}
   bess:
     model1: {'timestamp': '2021-06-13-18-35', 'model_name': 'MLR', 'sorting': 'num'}
-    model2: {'timestamp': '2021-06-17-16-56', 'model_name': 'TCN', 'sorting': 'num'}
+    #model2: {'timestamp': '2021-06-17-16-56', 'model_name': 'TCN', 'sorting': 'num'}
     model3: 
     model4: 
     model5: 
     model6: 
   vals:
     model1: {'timestamp': '2021-06-13-19-14', 'model_name': 'MLR', 'sorting': 'num'}
-    model2: {'timestamp': '2021-06-16-00-51', 'model_name': 'LSTM', 'sorting': 'num'}
-    model3: {'timestamp': '2021-06-16-11-29', 'model_name': 'TCN', 'sorting': 'num'}
-    model4: {'timestamp': '2021-06-16-12-58', 'model_name': 'TCN', 'sorting': 'num'}
-    model5:
-    model6:
-    #model13: {'timestamp': '2021-07-21-13-23', 'model_name': 'SIN', 'sorting': 'img'}
-    #model14: {'timestamp': '2021-07-21-13-54', 'model_name': 'SIN', 'sorting': 'img'}
-    #model15: {'timestamp': '2021-07-21-14-19', 'model_name': 'SIN', 'sorting': 'img'}
-    #model16: {'timestamp': '2021-07-21-15-01', 'model_name': 'SIN', 'sorting': 'img'}
-    #model19: {'timestamp': '2021-07-21-13-07', 'model_name': 'SIN', 'sorting': 'img'}
-    #model20: {'timestamp': '2021-07-21-13-34', 'model_name': 'SIN', 'sorting': 'img'}
-    #model21: {'timestamp': '2021-07-21-13-56', 'model_name': 'SIN', 'sorting': 'img'}
-    #model22: {'timestamp': '2021-07-21-14-48', 'model_name': 'SIN', 'sorting': 'img'}
-    #model23: {'timestamp': '2021-07-21-15-06', 'model_name': 'SIN', 'sorting': 'img'}
-    #model26: {'timestamp': '2021-07-21-13-08', 'model_name': 'SIN', 'sorting': 'img'}
-    #model27: {'timestamp': '2021-07-21-13-48', 'model_name': 'SIN', 'sorting': 'img'}
-    #model28: {'timestamp': '2021-07-21-13-57', 'model_name': 'SIN', 'sorting': 'img'}
-    #model29: {'timestamp': '2021-07-21-14-50', 'model_name': 'SIN', 'sorting': 'img'}
-    #model30: {'timestamp': '2021-07-21-15-07', 'model_name': 'SIN', 'sorting': 'img'}
-    #model33: {'timestamp': '2021-07-21-13-12', 'model_name': 'SIN', 'sorting': 'img'}
-    #model34: {'timestamp': '2021-07-21-13-50', 'model_name': 'SIN', 'sorting': 'img'}
+    #model5: {'timestamp': '2021-07-23-21-22', 'model_name': 'MLR', 'sorting': 'num'}
+    #model6: {'timestamp': '2021-07-24-04-45', 'model_name': 'SIN', 'sorting': 'num'}
+    model13: {'timestamp': '2021-07-21-13-23', 'model_name': 'SIN', 'sorting': 'img'}
+    model14: {'timestamp': '2021-07-21-13-54', 'model_name': 'SIN', 'sorting': 'img'}
+    model15: {'timestamp': '2021-07-21-14-19', 'model_name': 'SIN', 'sorting': 'img'}
+    model16: {'timestamp': '2021-07-21-15-01', 'model_name': 'SIN', 'sorting': 'img'}
+    model19: {'timestamp': '2021-07-21-13-07', 'model_name': 'SIN', 'sorting': 'img'}
+    model20: {'timestamp': '2021-07-21-13-34', 'model_name': 'SIN', 'sorting': 'img'}
+    model21: {'timestamp': '2021-07-21-13-56', 'model_name': 'SIN', 'sorting': 'img'}
+    model22: {'timestamp': '2021-07-21-14-48', 'model_name': 'SIN', 'sorting': 'img'}
+    model23: {'timestamp': '2021-07-21-15-06', 'model_name': 'SIN', 'sorting': 'img'}
+    model26: {'timestamp': '2021-07-21-13-08', 'model_name': 'SIN', 'sorting': 'img'}
+    model27: {'timestamp': '2021-07-21-13-48', 'model_name': 'SIN', 'sorting': 'img'}
+    model28: {'timestamp': '2021-07-21-13-57', 'model_name': 'SIN', 'sorting': 'img'}
+    model29: {'timestamp': '2021-07-21-14-50', 'model_name': 'SIN', 'sorting': 'img'}
+    model30: {'timestamp': '2021-07-21-15-07', 'model_name': 'SIN', 'sorting': 'img'}
+    model33: {'timestamp': '2021-07-21-13-12', 'model_name': 'SIN', 'sorting': 'img'}
+    model34: {'timestamp': '2021-07-21-13-50', 'model_name': 'SIN', 'sorting': 'img'}
     model35: {'timestamp': '2021-07-21-13-58', 'model_name': 'SIN', 'sorting': 'img'}
-    #model36: {'timestamp': '2021-07-21-14-53', 'model_name': 'SIN', 'sorting': 'img'}
-    #model37: {'timestamp': '2021-07-21-15-08', 'model_name': 'SIN', 'sorting': 'img'}
-    #model40: {'timestamp': '2021-07-21-13-20', 'model_name': 'SIN', 'sorting': 'img'}
-    #model41: {'timestamp': '2021-07-21-13-52', 'model_name': 'SIN', 'sorting': 'img'}
-    #model42: {'timestamp': '2021-07-21-13-59', 'model_name': 'SIN', 'sorting': 'img'}
-    #model43: {'timestamp': '2021-07-21-14-59', 'model_name': 'SIN', 'sorting': 'img'}
-    #model44: {'timestamp': '2021-07-21-15-11', 'model_name': 'SIN', 'sorting': 'img'}
+    model36: {'timestamp': '2021-07-21-14-53', 'model_name': 'SIN', 'sorting': 'img'}
+    model37: {'timestamp': '2021-07-21-15-08', 'model_name': 'SIN', 'sorting': 'img'}
+    model40: {'timestamp': '2021-07-21-13-20', 'model_name': 'SIN', 'sorting': 'img'}
+    model41: {'timestamp': '2021-07-21-13-52', 'model_name': 'SIN', 'sorting': 'img'}
+    model42: {'timestamp': '2021-07-21-13-59', 'model_name': 'SIN', 'sorting': 'img'}
+    model43: {'timestamp': '2021-07-21-14-59', 'model_name': 'SIN', 'sorting': 'img'}
+    model44: {'timestamp': '2021-07-21-15-11', 'model_name': 'SIN', 'sorting': 'img'}
+    #model50: {'timestamp': '2021-06-16-00-51', 'model_name': 'LSTM', 'sorting': 'num'}
+    #model51: {'timestamp': '2021-07-24-03-32', 'model_name': 'LSTM', 'sorting': 'num'}
+    #model52: {'timestamp': '2021-07-24-03-52', 'model_name': 'LSTM', 'sorting': 'num'}
+    model53: #{'timestamp': '2021-07-24-11-18', 'model_name': 'LSTM', 'sorting': 'num'}
+    #model54: {'timestamp': '2021-07-24-11-32', 'model_name': 'LSTM', 'sorting': 'num'}
+    #model55: {'timestamp': '2021-07-24-03-20', 'model_name': 'LSTM', 'sorting': 'num'}
+    #model56: {'timestamp': '2021-07-24-03-37', 'model_name': 'LSTM', 'sorting': 'num'}
+    #model57: {'timestamp': '2021-07-24-04-05', 'model_name': 'LSTM', 'sorting': 'num'}
+    #model58: {'timestamp': '2021-07-24-11-24', 'model_name': 'LSTM', 'sorting': 'num'}
+    #model59: {'timestamp': '2021-07-24-12-27', 'model_name': 'LSTM', 'sorting': 'num'}
+    #model60: {'timestamp': '2021-06-16-11-29', 'model_name': 'TCN', 'sorting': 'num'}
+    #model61: {'timestamp': '2021-07-06-19-13', 'model_name': 'TCN', 'sorting': 'num'}
+    #model62: {'timestamp': '2021-07-24-04-30', 'model_name': 'TCN', 'sorting': 'num'}
+    #model63: {'timestamp': '2021-07-24-05-00', 'model_name': 'TCN', 'sorting': 'num'}
+    model64: #{'timestamp': '2021-07-24-10-42', 'model_name': 'TCN', 'sorting': 'num'}
+    #model65: {'timestamp': '2021-07-24-10-57', 'model_name': 'TCN', 'sorting': 'num'}
+    #model66: {'timestamp': '2021-06-16-12-58', 'model_name': 'TCN', 'sorting': 'num'}
+    #model67: {'timestamp': '2021-07-22-12-54', 'model_name': 'TCN', 'sorting': 'num'}
+    #model68: {'timestamp': '2021-07-24-04-40', 'model_name': 'TCN', 'sorting': 'num'}
+    #model69: {'timestamp': '2021-07-24-05-39', 'model_name': 'TCN', 'sorting': 'num'}
+    #model70: {'timestamp': '2021-07-24-10-52', 'model_name': 'TCN', 'sorting': 'num'}
+    #model71: {'timestamp': '2021-07-24-11-05', 'model_name': 'TCN', 'sorting': 'num'}
+
   yvik:
     model1: {'timestamp': '2021-06-13-07-52', 'model_name': 'MLR', 'sorting': 'num'}
-    model2: {'timestamp': '2021-06-14-07-00', 'model_name': 'LSTM', 'sorting': 'num'}
-    model3: {'timestamp': '2021-06-15-00-25', 'model_name': 'TCN', 'sorting': 'num'}
-    model4: {'timestamp': '2021-06-16-00-15', 'model_name': 'TCN', 'sorting': 'num'}
+    #model2: {'timestamp': '2021-06-14-07-00', 'model_name': 'LSTM', 'sorting': 'num'}
+    #model3: {'timestamp': '2021-06-15-00-25', 'model_name': 'TCN', 'sorting': 'num'}
+    #model4: {'timestamp': '2021-06-16-00-15', 'model_name': 'TCN', 'sorting': 'num'}
     model5:
     model6:
   all:
     model1: {'timestamp': '2021-06-13-06-35', 'model_name': 'MLR', 'sorting': 'num'}
-    model2: {'timestamp': '2021-06-15-21-48', 'model_name': 'TCN', 'sorting': 'num'}
-    model3: {'timestamp': '2021-06-14-14-00', 'model_name': 'TCN', 'sorting': 'num'}
-    model4: {'timestamp': '2021-06-14-02-05', 'model_name': 'LSTM', 'sorting': 'num'}
+    #model2: {'timestamp': '2021-06-15-21-48', 'model_name': 'TCN', 'sorting': 'num'}
+    #model3: {'timestamp': '2021-06-14-14-00', 'model_name': 'TCN', 'sorting': 'num'}
+    #model4: {'timestamp': '2021-06-14-02-05', 'model_name': 'LSTM', 'sorting': 'num'}
     model5:
     model6:
 
 
+    

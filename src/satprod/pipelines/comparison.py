@@ -10,12 +10,6 @@ from sklearn.metrics import mean_absolute_error
 
 from tasklog.tasklogger import logging
 
-'''
-plt.rcParams.update({
-    "text.usetex": True,
-    "font.family": "sans-serif",
-    "font.sans-serif": ["Helvetica"]})
-# for Palatino and other serif fonts use:
 plt.rcParams.update({
     "text.usetex": True,
     "font.family": "serif",
@@ -39,8 +33,8 @@ plt.rc('axes', labelsize=MEDIUM_SIZE)    # fontsize of the x and y labels
 plt.rc('xtick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
 plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
 plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
-plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
-'''
+plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title'''
+
 class ModelComparison():
     
     def __init__(self, park: str, config):
@@ -158,28 +152,53 @@ class ModelComparison():
         models = {}
         if dataset_name=='train':
             models['Persistence'] = self.persistence_train_error_matrix
+            index = 1
             for key, model in self.eval_dict.items():
                 if self.pred_sequence_length==6:
-                    models[f'{model.model_name}'+f'{model.timestamp}'] = model.train_error_matrix[1:,:]
+                    #models[f'{model.model_name} ({model.timestamp})'] = model.train_error_matrix[1:,:]
+                    models[f'{model.model_name} ({index})'] = model.train_error_matrix[1:,:]
                 else:
-                    models[f'{model.model_name}'+f'{model.timestamp}'] = model.train_error_matrix
+                    #models[f'{model.model_name} ({model.timestamp})'] = model.train_error_matrix
+                    if model.model_name=='SIN':
+                        models[f'{model.model_name} ({index})'] = model.train_error_matrix
+                    else:
+                        models[f'{model.model_name}'] = model.train_error_matrix
+                if model.model_name=='SIN':
+                    index += 1
         elif dataset_name=='valid':
             models['Persistence'] = self.persistence_valid_error_matrix
+            index = 1
             for key, model in self.eval_dict.items():
                 if self.pred_sequence_length==6:
-                    models[f'{model.model_name}'+f'{model.timestamp}'] = model.train_error_matrix[1:,:]
+                    #models[f'{model.model_name} ({model.timestamp})'] = model.valid_error_matrix[1:,:]
+                    models[f'{model.model_name} ({index})'] = model.valid_error_matrix[1:,:]
                 else:
-                    models[f'{model.model_name}'+f'{model.timestamp}'] = model.valid_error_matrix
+                    #models[f'{model.model_name} ({model.timestamp})'] = model.valid_error_matrix
+                    if model.model_name=='SIN':
+                        models[f'{model.model_name} ({index})'] = model.valid_error_matrix
+                    else:
+                        models[f'{model.model_name}'] = model.valid_error_matrix
+                
+                if model.model_name=='SIN':
+                    index += 1
         else:
-            models['TE (benchmark)'] = self.benchmark_test_error_matrix
             models['Persistence'] = self.persistence_test_error_matrix
+            index = 1
             for key, model in self.eval_dict.items():
                 if self.pred_sequence_length==6:
-                    models[f'{model.model_name}'+f'{model.timestamp}'] = model.train_error_matrix[1:,:]
+                    #models[f'{model.model_name} ({model.timestamp})'] = model.test_error_matrix[1:,:]
+                    models[f'{model.model_name} ({index})'] = model.test_error_matrix[1:,:]
                 else:
-                    models[f'{model.model_name} ({model.timestamp})'] = model.test_error_matrix
+                    #models[f'{model.model_name} ({model.timestamp})'] = model.test_error_matrix
+                    if model.model_name=='SIN':
+                        models[f'{model.model_name} ({index})'] = model.test_error_matrix
+                    else:
+                        models[f'{model.model_name}'] = model.test_error_matrix
+                if model.model_name=='SIN':
+                    index += 1
+            models['TE'] = self.benchmark_test_error_matrix
         
-        width = 0.05  # the width of the bars
+        width = 0.1  # the width of the bars
         labels = ['+1h', '+2h', '+3h', '+4h', '+5h']
 
         x_axis = []
@@ -189,6 +208,7 @@ class ModelComparison():
         
         fig, ax = plt.subplots()
         rects = []
+        
         for i, (key, value) in enumerate(models.items()):
             rects.append(ax.bar(x_axis[i], np.ravel(value), width, label=key))
 
@@ -203,7 +223,7 @@ class ModelComparison():
         ax.set_xticklabels(labels)
         #ax.legend()
         #ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
-        ax.legend(loc='upper left')
+        ax.legend(loc='upper left', ncol=2)
         plt.tight_layout()
         plt.savefig(f'{self.comparison_storage_path}/{dataset_name}_comparison.png')
         
@@ -296,6 +316,7 @@ class ModelComparison():
         trainable_params_in_networks = []
         crops = []
         weight_decays = []
+        dropouts = []
         
         for model_id, model in self.eval_dict.items():
             if model.model_name!='SIN': continue
@@ -305,16 +326,10 @@ class ModelComparison():
             lowest_valid_maes.append(model.results.lowest_valid_mae)
             weight_decays.append(model.train_config.weight_decay)
             crops.append(model.data_config.crop_image)
-            '''for key, value in vars(model.net).items():
+            for key, value in vars(model.net).items():
                 if not key.startswith('_') and key!='training':
-                    if key=='channels':
-                        channel_list.append(value)
-                    if key=='kernel_size':
-                        kernel_sizes.append(value)
-                    if key=='dropout':
+                    if key=='dropout_value':
                         dropouts.append(value)
-                    if key=='sequence_length':
-                        sequence_lengths.append(value)'''
         
         df['lowest_valid_mae'] = lowest_valid_maes
         df['features'] = features_used
@@ -322,6 +337,7 @@ class ModelComparison():
         df['trainable_params_in_network'] = trainable_params_in_networks
         df['weight_decay'] = weight_decays
         df['crop'] = crops
+        df['dropout'] = dropouts
         
         logging.info(df)
         

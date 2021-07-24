@@ -33,10 +33,20 @@ class SIN(nn.Module):
             self.vgg = VGG(**vgg_params)
             self.num_image_features = vgg_params['output_size']
         else:
-            raise NotImplementedError
+            self.num_image_features = 1
         
         self.linear = nn.Linear(
             self.num_image_features*self.sequence_length, 
+            self.output_size*self.num_output_features
+        )
+        
+        self.linear_speed_1 = nn.Linear(
+            self.num_image_features*self.sequence_length, 
+            256
+        )
+        
+        self.linear_speed_2 = nn.Linear(
+            256,
             self.output_size*self.num_output_features
         )
         
@@ -47,8 +57,26 @@ class SIN(nn.Module):
     def forward(self, data_dict: dict):
         x_img = data_dict['X_img']
         
-        assert x_img is not None, 'Feature error: The dataset needs to contain past features for the LSTM.'
+        x_weather = data_dict['X_weather']
         
+        if x_weather is None:
+            assert x_img is not None, 'Feature error: The dataset needs to contain image features.'
+        else:
+            assert x_img is None
+            x = x_weather
+            self.batch_size = x.shape[0]
+            
+            x = x.view(self.batch_size, self.num_image_features*self.sequence_length)
+            
+            x = self.linear_speed_1(x)
+            
+            x = self.linear_speed_2(self.dropout(self.relu(x)))
+            
+            x = x.view(self.batch_size, self.output_size, self.num_output_features)
+            # x.shape: (batch_size, output_size, num_output_features)
+            
+            return x
+
         self.batch_size = x_img.shape[0]
         x = image_feature_extraction(x_img, self)
         

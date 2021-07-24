@@ -433,10 +433,6 @@ def get_sequenced_data(
         
         # weather forecasts
         if data_config.use_numerical_forecasts:
-            #print(get_columns(input_data, f'+{0+1}h').columns)
-            #print(get_columns(input_data, f'+{0+1}h').iloc[-1])
-            #exit()
-            
             forecast_data = []
             for i in range(data_config.pred_sequence_length):
                 forecast_data.append(list(get_columns(input_data, f'+{i+1}h').iloc[-1].values))
@@ -484,10 +480,11 @@ def get_sequenced_data(
         X_weather_forecasts = torch.stack(forecast_weather_array)
         data_dict['X_weather_forecasts'] = Variable(X_weather_forecasts).float().to(device)
     
-    file_object = open('prediction_times.txt', 'a')
+    '''file_object = open('prediction_times.txt', 'a')
     for j in batch_indices_used:
         file_object.write(str(data.data.index[j])+'\n')
-    file_object.close()
+    file_object.close()'''
+    
     return data_dict
 
 def init_data_and_model(config):

@@ -8,6 +8,7 @@ from sklearn.metrics import mean_absolute_error
 from matplotlib import pyplot as plt
 import pickle
 from numpy import savetxt, loadtxt
+
 import PIL
 import torch.nn.functional as F
 import torchvision.models as models
@@ -24,11 +25,6 @@ from satprod.data_handlers.data_utils import get_columns
 
 from tasklog.tasklogger import logging
 
-'''plt.rcParams.update({
-    "text.usetex": True,
-    "font.family": "sans-serif",
-    "font.sans-serif": ["Helvetica"]})
-# for Palatino and other serif fonts use:
 plt.rcParams.update({
     "text.usetex": True,
     "font.family": "serif",
@@ -144,54 +140,6 @@ class ModelEvaluation():
         }
         
         self.get_stored_results()
-        
-        
-        
-        '''logging.info('Starting gradcam')
-        
-        img_dir = f'{self.root}/data/img/grid/2019/04/11'
-        # img_name = 'collies.JPG'
-        # img_name = 'multiple_dogs.jpg'
-        # img_name = 'snake.JPEG'
-        img_name = '17;00;00.png'
-        img_path = os.path.join(img_dir, img_name)
-
-        img = cv2.imread(img_path, 1)
-        #img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        pil_img = PIL.Image.fromarray(img)
-        #pil_img = PIL.Image.open(img_path)
-        
-        torch_img = transforms.Compose([
-            transforms.Resize((224, 224)),
-            transforms.ToTensor()
-        ])(pil_img).to('cpu')
-        normed_torch_img = transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])(torch_img)[None]
-        
-        configs = [
-            dict(model_type='resnet', arch=self.net.resnet.resnet18, layer_name='layer4'),
-        ]
-        for config in configs:
-            config['arch'].to('cpu').eval()
-
-        cams = [
-            [cls.from_config(**config) for cls in (GradCAM, GradCAMpp)] for config in configs
-        ]
-        
-        images = []
-        for gradcam, gradcam_pp in cams:
-            mask, _ = gradcam(normed_torch_img)
-            heatmap, result = visualize_cam(mask, torch_img)
-
-            mask_pp, _ = gradcam_pp(normed_torch_img)
-            heatmap_pp, result_pp = visualize_cam(mask_pp, torch_img)
-            
-            images.extend([torch_img.cpu(), heatmap, heatmap_pp, result, result_pp])
-            
-        grid_image = make_grid(images, nrow=5)
-        
-        plt.imshow(transforms.ToPILImage()(grid_image))
-        plt.show()
-        exit()'''
         
         if np.array(self.results.corr_train_preds).shape[1]==6:
             self.results.corr_train_preds = np.array(self.results.corr_train_preds)[:, -5:, :]
@@ -353,7 +301,7 @@ class ModelEvaluation():
         else:
             axis = axs
         
-        fig.suptitle('MAE')
+        #fig.suptitle('MAE')
         for i in range(error_matrix.shape[1]):
             axis[i].bar(range(error_matrix.shape[0]), error_matrix.T[i], align='center')
             axis[i].set_title(f'{self.data_config.parks[i]} - total {dataset_name} MAE: {total_mae}')
@@ -378,17 +326,21 @@ class ModelEvaluation():
         for i in range(self.data_config.pred_sequence_length):
             for j in range(len(self.data_config.parks)):
                 #plt.subplot(self.data_config.pred_sequence_length, len(self.data_config.parks), index) #(nrows, ncols, index)
-                plt.figure()
-                plt.ylabel('production (kWh/h)')
-                plt.xlabel('hours')
+                plt.figure(figsize=(8,2.5))
+                plt.ylabel(r'$P$ (MW)')
+                plt.xlabel('time (hours)')
                 
                 plt.plot(np.ravel(np.array(targs_unscaled)[:n_samples_shown, i, j]), label='targets')
                 plt.plot(np.ravel(np.array(preds_unscaled)[:n_samples_shown, i, j]), label='predicitions')
                 
-                if self.data_config.pred_sequence_length==6:
-                    plt.title(f'{i}h ahead at {self.park_name[self.data_config.parks[j]]}, {dataset_name} set')
+                if dataset_name=='valid':
+                    dataset_name_name='validation'
                 else:
-                    plt.title(f'{i+1}h ahead at {self.park_name[self.data_config.parks[j]]}, {dataset_name} set')
+                    dataset_name_name = dataset_name
+                if self.data_config.pred_sequence_length==6:
+                    plt.title(f'{i}h ahead at {self.park_name[self.data_config.parks[j]]}, {dataset_name_name} set')
+                else:
+                    plt.title(f'{i+1}h ahead at {self.park_name[self.data_config.parks[j]]}, {dataset_name_name} set')
                 #plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
                 plt.legend()
                 
@@ -409,3 +361,50 @@ class ModelEvaluation():
         plt.tight_layout()
         plt.savefig(f'{self.path}/training_curve.png')
         plt.close()
+    
+    def gradcam(self, img_path):
+        path = f'{self.root}/data/img/grid/{img_path}'
+        img = cv2.imread(path, 1)
+        #img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        pil_img = PIL.Image.fromarray(img)
+        #pil_img = PIL.Image.open(img_path)
+
+        torch_img = transforms.Compose([
+            transforms.Resize((224, 224)),
+            transforms.ToTensor()
+        ])(pil_img).to('cpu')
+        normed_torch_img = transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])(torch_img)[None]
+
+        configs = [
+            dict(model_type='resnet', arch=self.net.resnet.resnet18, layer_name='layer4'),
+        ]
+        for config in configs:
+            config['arch'].to('cpu').eval()
+
+        cams = [
+            [cls.from_config(**config) for cls in (GradCAM, GradCAMpp)] for config in configs
+        ]
+
+        images = []
+        for gradcam, gradcam_pp in cams:
+            mask, _ = gradcam(normed_torch_img)
+            heatmap, result = visualize_cam(mask, torch_img)
+
+            mask_pp, _ = gradcam_pp(normed_torch_img)
+            heatmap_pp, result_pp = visualize_cam(mask_pp, torch_img)
+
+            #images.extend([torch_img.cpu(), heatmap, heatmap_pp, result, result_pp])
+            images.extend([torch_img.cpu(), heatmap_pp, result_pp])
+
+        grid_image = make_grid(images, nrow=3)
+
+        plt.figure(figsize=(16,8))
+        plt.imshow(transforms.ToPILImage()(grid_image))
+        os.makedirs(f'{self.path}/gradcam', exist_ok=True)
+        name = '-'.join(img_path.split('/')[-4:])
+        plt.xticks([])
+        plt.yticks([])
+        plt.axis('off')
+        plt.tight_layout()
+        plt.savefig(f'{self.path}/gradcam/{name}')
+        plt.show()

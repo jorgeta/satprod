@@ -53,8 +53,7 @@ class MLR(nn.Module):
                         x_weather_forecasts.view(self.batch_size, -1)
                     ], dim=1)
                 else:
-                    x = x_weather.view(self.batch_size, -1), 
+                    x = x_weather.view(self.batch_size, -1)
             else:
                 raise Exception('MLR needs either production, wind speed or wind direction to function.')
-        
         return self.linear(x).view(self.batch_size, self.pred_sequence_length, self.output_size)
